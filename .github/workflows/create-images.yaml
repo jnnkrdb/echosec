@@ -51,7 +51,7 @@ jobs:
           password: ${{ secrets.GHP_TOKEN }}
 
   build:
-    needs: version
+    needs: [ version, login-ghcr ]
     runs-on: ubuntu-latest
     env:
       REPOSITORY: ghcr.io/jnnkrdb/echosec
@@ -95,12 +95,17 @@ jobs:
           push: true
 
   helm:
-    needs: version
+    needs: [ version, login-ghcr ]
     runs-on: ubuntu-latest
     env:
       HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
       HELM_DIR: ./.helm/echosec
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
       - name: Lint
         run: helm lint $HELM_DIR
       
