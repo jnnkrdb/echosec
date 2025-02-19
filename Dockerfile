@@ -38,7 +38,9 @@ RUN addgroup -S echosec && adduser -S echosec -H -h /opt/echosec -s /bin/sh -G e
 
 # Copy Operators Binary
 COPY --from=operator /echosec /usr/local/bin/echosec
-RUN chown echosec:echosec /usr/local/bin/echosec &&\
+RUN chmod 700 /usr/local/bin/echosec &&\
+    chmod 700 -R /opt/echosec &&\
+    chown echosec:echosec /usr/local/bin/echosec &&\
     chown echosec:echosec -R /opt/echosec
     
 # change user to echosec user
