@@ -14,7 +14,7 @@ image:
 
 
 # This section builds out the service account
-serviceAccount:
+rbac:
   # Annotations to add to the service account
   annotations: {}
   # Labels to add to the service account
