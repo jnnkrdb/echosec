@@ -23,6 +23,8 @@ RUN go mod download && go build -o /echosec cmd/main.go
 
 # ---------------------------------------------------------------------------------------------- Final Alpine
 FROM alpine:3.19
+LABEL org.opencontainers.image.source="https://github.com/jnnkrdb/echosec"
+LABEL org.opencontainers.image.description="Operator for cluster-wide mirroring of secrets/configmaps."
 WORKDIR /
 
 # install neccessary binaries
