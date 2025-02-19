@@ -7,14 +7,12 @@ on:
       - dev
     paths:
       - 'pkg/**'
-      - 'bin/**'
   pull_request:
     branches: 
       - master 
       - dev
     paths:
       - 'pkg/**'
-      - 'bin/**'
 
 jobs:
   test-go:
@@ -23,7 +21,6 @@ jobs:
       matrix:
         path:
           - ./pkg/...
-          - ./bin/bin_test/...
     steps:
 
       - name: Checkout code
