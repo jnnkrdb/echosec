@@ -1,5 +1,6 @@
 debug: true
-namespace: default 
+namespaces: 
+  - default 
 syncperiodminutes: 5
-labels:
-  selector: {}
+#labels:
+#  selector: {}
