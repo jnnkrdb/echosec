@@ -12,7 +12,7 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "echosec.name" . }}
+      app.kubernetes.io/name: echosec
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
