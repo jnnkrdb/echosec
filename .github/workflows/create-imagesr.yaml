@@ -6,10 +6,8 @@ on:
       - master
       - dev
     paths-ignore:
-      - '.github/devcontainer/**'
+      - '.devcontainer/**'
       - '.github/docs/**'
-
-
       - 'README.md'
       - 'LICENSE'
   pull_request:
