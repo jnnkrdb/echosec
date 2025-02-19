@@ -27,6 +27,7 @@ func LoadConfig(setupLog logr.Logger) {
 
 	if viper.GetBool("debug") {
 		viper.Debug()
+		setupLog.Info("currently set configs", "configs", viper.AllSettings())
 	}
 }
 
