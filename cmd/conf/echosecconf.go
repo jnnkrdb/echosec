@@ -49,5 +49,4 @@ func setDefaults(setupLog logr.Logger) {
 	var selectorLabels = make(map[string]string)
 	selectorLabels["echosec.jnnkrdb.de/mirror-me"] = "true"
 	viper.SetDefault("labels.selector", selectorLabels)
-
 }
