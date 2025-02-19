@@ -1,0 +1,43 @@
+name: RUNNNING GO TESTS
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths:
+      - 'pkg/**'
+      - 'bin/**'
+  pull_request:
+    branches: 
+      - master 
+      - dev
+    paths:
+      - 'pkg/**'
+      - 'bin/**'
+
+jobs:
+  test-go:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - ./pkg/...
+          - ./bin/bin_test/...
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup GO
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+      
+      - name: Install Deps
+        run: go mod download
+
+      - name: Test [${{ matrix.path }}]
+        run: go test ${{ matrix.path }} -v
