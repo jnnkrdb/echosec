@@ -23,9 +23,9 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	"github.com/jnnkrdb/echosec/cmd/config"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -33,6 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/jnnkrdb/echosec/cmd/conf"
+	"github.com/spf13/viper"
+
+	"github.com/jnnkrdb/echosec/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -41,24 +46,28 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 
 	// default time sync duration for missed objects
-	syncPeriodMinutes = time.Duration(10 * time.Minute)
+	syncPeriodMinutes = time.Duration(time.Minute * time.Duration(viper.GetInt("syncperiodminutes")))
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
-
 }
 
 func main() {
+
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
+	conf.LoadConfig(setupLog)
+
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// set cache configs
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -68,8 +77,9 @@ func main() {
 		LeaderElection:         true,
 		LeaderElectionID:       "echosec.jnnkrdb.de",
 		Cache: cache.Options{
-			SyncPeriod: &syncPeriodMinutes,
-			Namespaces: config.GetNamespacesFromConfigOrToken(),
+			SyncPeriod:           &syncPeriodMinutes,
+			Namespaces:           viper.GetStringSlice("namespaces"),
+			DefaultLabelSelector: labels.SelectorFromSet(viper.GetStringMapString("labels.selector")),
 		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -88,6 +98,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controller.SecretReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Secret")
+		os.Exit(1)
+	}
+	if err = (&controller.ConfigMapReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ConfigMap")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

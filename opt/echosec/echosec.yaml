@@ -1,0 +1,5 @@
+debug: true
+namespace: default 
+syncperiodminutes: 5
+labels:
+  selector: {}
