@@ -33,6 +33,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: echosec
+      volumes:
+        - name: config
+          configMap:
+            name: echosec-yaml
+            items:
+              - key: echosec.yaml
+                path: echosec.yaml
       containers:
         - name: echosec
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -44,6 +51,9 @@ spec:
             - name: http-healthz
               containerPort: 8081
               protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /opt/echosec/echosec.yaml
           startupProbe:
           livenessProbe:
           readinessProbe:

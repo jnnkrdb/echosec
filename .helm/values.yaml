@@ -29,13 +29,12 @@ pod:
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   labels: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+# this value is used to implement a configfile for the echosec service
+# if no content is given, then the default valuse will be used
+#echosecYaml: 
+#  debug: true
+#  namespaces: 
+#    - default 
+#  syncperiodminutes: 5
+#  #labels:
+#  #  selector: {}
