@@ -1,0 +1,14 @@
+name: HELM CHART
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - '.devcontainer/**'
+      - '.github/docs/**'
+      - 'README.md'
+      - 'LICENSE'
+
+env:
+  HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
