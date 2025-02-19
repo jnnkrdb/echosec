@@ -1,4 +1,4 @@
-name: RUNNNING GO TESTS
+name: RUNNING GO TESTS
 
 on:
   push:
