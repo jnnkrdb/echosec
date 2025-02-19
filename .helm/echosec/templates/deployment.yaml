@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echosec
+  labels: 
+    helm.sh/chart: {{ include "echosec.chart" . }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    jnnkrdb.de/src: github.com/jnnkrdb/echosec
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "echosec.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        jnnkrdb.de/src: github.com/jnnkrdb/echosec
+        {{- with .Values.pod.annotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:    
+        helm.sh/chart: {{ include "echosec.chart" . }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        {{- with .Values.pod.labels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: echosec
+      containers:
+        - name: echosec
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: http-healthz
+              containerPort: 8081
+              protocol: TCP
+          startupProbe:
+          livenessProbe:
+          readinessProbe:
+          resources: {}
