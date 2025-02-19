@@ -12,13 +12,13 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      helm.sh/chart: {{ include "echosec.chart" . }}
-      app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-      app.kubernetes.io/managed-by: {{ .Release.Service }}
+      jnnkrdb.de/src: github.com/jnnkrdb/echosec
+      jnnkrdb.de/release: {{ .Release.Name }}
   template:
     metadata:
       annotations:
         jnnkrdb.de/src: github.com/jnnkrdb/echosec
+        jnnkrdb.de/release: {{ .Release.Name }}
         {{- with .Values.pod.annotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
