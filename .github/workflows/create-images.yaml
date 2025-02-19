@@ -36,9 +36,9 @@ jobs:
       - name: Determine Version
         id:   gitversion # id to later be referenced
         uses: gittools/actions/gitversion/execute@v0
-        with:
-          useConfigFile: true
-          configFilePath: .github/gitversion/GitVersion.yml
+        #with:
+        #  useConfigFile: true
+        #  configFilePath: .github/gitversion/GitVersion.yml
       
       - id: version
         run: echo "semver=${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_OUTPUT
