@@ -14,4 +14,17 @@ metadata:
       {{- toYaml . | nindent 4 }}
     {{- end }}
   name: echosec
-rules: []
+rules: 
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
