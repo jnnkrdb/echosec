@@ -1,0 +1,95 @@
+name: CREATE IMAGES
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths-ignore:
+      - '.devcontainer/**'
+      - '.github/docs/**'
+      - 'README.md'
+      - 'LICENSE'
+  pull_request:
+    branches: 
+      - master 
+
+env:
+  HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      semver: ${{ steps.gitversion.outputs.semVer }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0
+        with:
+          versionSpec: '5.x'
+          
+      - name: Determine Version
+        id:   gitversion # id to later be referenced
+        uses: gittools/actions/gitversion/execute@v0
+        #with:
+        #  useConfigFile: true
+        #  configFilePath: .github/gitversion/GitVersion.yml
+      
+      - id: version
+        run: echo "semver=${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_OUTPUT
+
+  build:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      REPOSITORY: ghcr.io/jnnkrdb/echosec
+      DOCKERFILE: ./Dockerfile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: bash-version
+        run: |
+          echo ${{ needs.version.outputs.semver }} > ./opt/echosec/VERSION
+          echo $(cat './opt/echosec/VERSION')
+
+      - name: Login to Github Packages
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHP_TOKEN }}
+
+      - name: Build Image Without Push
+        uses: docker/build-push-action@v5
+        if: github.event_name == 'pull_request'
+        with:
+          context: "."
+          file: ${{ env.DOCKERFILE }}
+          #tags: ${{ env.REPOSITORY }}:latest,${{ env.REPOSITORY }}:${{ needs.version.outputs.semver }}
+          push: false
+      
+      - name: Build Image With Push - Dev
+        uses: docker/build-push-action@v5
+        if: github.ref == 'refs/heads/dev'
+        with:
+          context: "."
+          file: ${{ env.DOCKERFILE }}
+          tags: ${{ env.REPOSITORY }}:dev
+          push: true
+
+      - name: Build Image With Push - Prod
+        uses: docker/build-push-action@v5
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        with:
+          context: "."
+          file: ${{ env.DOCKERFILE }}
+          tags: ${{ env.REPOSITORY }}:latest,${{ env.REPOSITORY }}:${{ needs.version.outputs.semver }}
+          push: true
