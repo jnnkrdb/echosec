@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
-      HELM_DIR: .helm/echosec
+      HELM_DIR: ./.helm/echosec
     steps:
       - name: Lint
         run: helm lint $HELM_DIR
