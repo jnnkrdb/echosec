@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  annotations:
+  labels:
     echosec.jnnkrdb.de/mirror-me: "true"
   name: test-cm-3
 data:

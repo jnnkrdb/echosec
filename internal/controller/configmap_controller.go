@@ -32,10 +32,20 @@ type ConfigMapReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var _log = log.FromContext(ctx)
+	var defaultResult = ctrl.Result{RequeueAfter: 5 * time.Minute}
 
 	_log.Info("got item", "name", req.Name, "namespace", req.Namespace)
 
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	var srcConfigMap = &corev1.ConfigMap{}
+
+	if err := r.Client.Get(ctx, req.NamespacedName, srcConfigMap, &client.GetOptions{}); err != nil {
+		_log.Error(err, "error receiving configmap from cluster")
+		return defaultResult, err
+	}
+
+	_log.Info("received configmap", "configmap.uid", srcConfigMap.UID)
+
+	return defaultResult, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
