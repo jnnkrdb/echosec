@@ -3,6 +3,7 @@ package conf
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -29,7 +30,7 @@ func InitializeConfig() {
 
 	// load configs from env vars
 	viper.SetEnvPrefix("ESEC")
-	//viper.EnvKeyReplacer()
+	viper.EnvKeyReplacer(strings.NewReplacer("_", "."))
 	viper.AutomaticEnv()
 
 	// validate if debug is activated
