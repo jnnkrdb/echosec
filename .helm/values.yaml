@@ -32,7 +32,8 @@ pod:
 # this value is used to implement a configfile for the echosec service
 # if no content is given, then the default valuse will be used
 #echosecYaml: 
-#  debug: true
+#  log:
+#    debug: true
 #  namespaces: 
 #    - default 
 #  syncperiodminutes: 5

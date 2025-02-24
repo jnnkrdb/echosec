@@ -57,13 +57,13 @@ func init() {
 
 func main() {
 
+	conf.InitializeConfig()
+
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
-
-	conf.LoadConfig(setupLog)
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    echosec.jnnkrdb.de/mirror-me: "true"
+  name: test-cm-2
+data:
+  test: This is a Test#
+  version: "2"
