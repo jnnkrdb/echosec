@@ -1,53 +1,63 @@
 package conf
 
 import (
+	"log/slog"
 	"os"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 )
 
 const namespace_file string = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
-// load the configs from default or configfile
-func LoadConfig(setupLog logr.Logger) {
+// initialize the integration of configs
+func InitializeConfig() {
 
-	setupLog.Info("set default configs")
-	setDefaults(setupLog)
+	// setting the default config value, if no other sources are parsed
+	slog.Info("set default configs")
+	for _, item := range configs {
+		viper.SetDefault(item.Name, item.Value)
+	}
 
-	setupLog.Info("loading configs")
-
-	// set the source of the config file
+	// set the source of the configs from file and load from it
+	slog.Info("loading configs from file")
 	viper.SetConfigName("echosec")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/opt/echosec")
 	if err := viper.ReadInConfig(); err != nil {
-		setupLog.Error(err, "unable to read config file", "source", viper.ConfigFileUsed())
+		slog.Error("unable to read config file", "source", viper.ConfigFileUsed(), "err", err)
 	}
 
+	// load configs from env vars
+	viper.SetEnvPrefix("ESEC")
+	viper.AutomaticEnv()
+
+	// validate if debug is activated
 	if viper.GetBool("debug") {
 		viper.Debug()
-		setupLog.Info("currently set configs", "configs", viper.AllSettings())
+		slog.Info("currently set configs", "configs", viper.AllSettings())
 	}
 }
 
-// set the default configs
-func setDefaults(setupLog logr.Logger) {
+// ----------------------------------------------------------------------------------------------------------- Setting the defaults
 
-	// set the default config values
-	viper.SetDefault("debug", false)
-	viper.SetDefault("namespaces",
-		func() []string {
-			if dat, err := os.ReadFile(namespace_file); err != nil {
-				setupLog.Error(err, "couldn't calculate namespace, are we running in a cluster?")
-				os.Exit(1)
-			} else {
-				return []string{string(dat)}
-			}
-			return []string{}
-		}())
-	viper.SetDefault("syncperiodminutes", 10)
-	var selectorLabels = make(map[string]string)
-	selectorLabels["echosec.jnnkrdb.de/mirror-me"] = "true"
-	viper.SetDefault("labels.selector", selectorLabels)
+var configs = []struct {
+	Name  string
+	Value any
+}{
+	{Name: "log.debug", Value: false},
+	{Name: "namespaces", Value: func() []string {
+		if dat, err := os.ReadFile(namespace_file); err != nil {
+			slog.Error("couldn't calculate namespace, are we running in a cluster?", "error", err)
+			os.Exit(1)
+		} else {
+			return []string{string(dat)}
+		}
+		return []string{}
+	}()},
+	{Name: "syncperiodminutes", Value: 10},
+	{Name: "labels.selector", Value: func() map[string]string {
+		var selectorLabels = make(map[string]string)
+		selectorLabels["echosec.jnnkrdb.de/mirror-me"] = "true"
+		return selectorLabels
+	}()},
 }
