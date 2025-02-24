@@ -29,10 +29,11 @@ func InitializeConfig() {
 
 	// load configs from env vars
 	viper.SetEnvPrefix("ESEC")
+	//viper.EnvKeyReplacer()
 	viper.AutomaticEnv()
 
 	// validate if debug is activated
-	if viper.GetBool("debug") {
+	if viper.GetBool("log.debug") {
 		viper.Debug()
 		log.Println("currently set configs", "configs", viper.AllSettings())
 	}
