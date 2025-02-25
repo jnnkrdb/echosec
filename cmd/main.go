@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/jnnkrdb/echosec/cmd/conf"
+	"github.com/jnnkrdb/echosec/pkg/reconcilation"
 	"github.com/spf13/viper"
 
 	"github.com/jnnkrdb/echosec/internal/controller"
@@ -77,9 +78,13 @@ func main() {
 		LeaderElection:         true,
 		LeaderElectionID:       "echosec.jnnkrdb.de",
 		Cache: cache.Options{
-			SyncPeriod:           &syncPeriodMinutes,
-			Namespaces:           viper.GetStringSlice("namespaces"),
-			DefaultLabelSelector: labels.SelectorFromSet(viper.GetStringMapString("labels.selector")),
+			SyncPeriod: &syncPeriodMinutes,
+			Namespaces: viper.GetStringSlice("namespaces"),
+			DefaultLabelSelector: labels.SelectorFromSet(func() map[string]string {
+				var selectorLabels = make(map[string]string)
+				selectorLabels[reconcilation.AnnotationEnableMirror] = "true"
+				return selectorLabels
+			}()),
 		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the

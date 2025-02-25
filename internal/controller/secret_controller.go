@@ -4,11 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/jnnkrdb/echosec/pkg/finalization"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // SecretReconciler reconciles a Secret object
@@ -32,7 +35,7 @@ type SecretReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var _log = log.FromContext(ctx)
-	var defaultResult = ctrl.Result{RequeueAfter: 5 * time.Minute}
+	var defaultResult = ctrl.Result{RequeueAfter: time.Duration(viper.GetInt("syncperiodminutes")) * time.Minute}
 
 	_log.Info("got item", "name", req.Name, "namespace", req.Namespace)
 
@@ -40,6 +43,10 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if err := r.Client.Get(ctx, req.NamespacedName, srcSecret, &client.GetOptions{}); err != nil {
 		_log.Error(err, "error receiving secret from cluster")
+		return defaultResult, err
+	}
+
+	if finalized, err := finalization.Finalize(ctx, r.Client, srcSecret); err != nil || finalized {
 		return defaultResult, err
 	}
 
@@ -52,5 +59,6 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Secret{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }
