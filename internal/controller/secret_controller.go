@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jnnkrdb/echosec/pkg/finalization"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,10 +42,6 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if err := r.Client.Get(ctx, req.NamespacedName, srcSecret, &client.GetOptions{}); err != nil {
 		_log.Error(err, "error receiving secret from cluster")
-		return defaultResult, err
-	}
-
-	if finalized, err := finalization.Finalize(ctx, r.Client, srcSecret); err != nil || finalized {
 		return defaultResult, err
 	}
 
