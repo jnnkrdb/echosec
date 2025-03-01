@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jnnkrdb/echosec/pkg/finalization"
+	"github.com/jnnkrdb/echosec/pkg/reconcilation/finalization"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,26 +47,35 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return defaultResult, err
 	}
 
+	// check if the obj contains the finalizer
 	if err := finalization.Check(ctx, r.Client, srcConfigMap); err != nil {
 		return defaultResult, err
 	}
 
 	// finalize if requested
-
-	if finalized, err := finalization.Finalize(ctx, r.Client, srcConfigMap, func() ([]client.Object, error) {
-		var configmaps = &corev1.ConfigMapList{}
-		if err := r.Client.List(ctx, configmaps, &client.ListOptions{}); err != nil {
-			return []client.Object{}, err
-		}
-		return []client.Object(configmaps.Items), nil
-	}); err != nil || finalized {
-		return defaultResult, err
-	}
-
 	if srcConfigMap.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(srcConfigMap, finalization.Finalizer) {
 
-		for _, item := range configmaps.Items {
+		var (
+			configmaps      = &corev1.ConfigMapList{}
+			successful bool = false
+		)
+		if err := r.Client.List(ctx, configmaps, &client.ListOptions{}); err != nil {
+			return defaultResult, err
+		}
 
+		for _, item := range configmaps.Items {
+			_log.Info("checking configmap", "namespace", item.Namespace, "name", item.Name)
+
+			// TODO: implement code for finalization
+		}
+
+		// after finalization remove the finalizer from the object
+		if successful {
+			controllerutil.RemoveFinalizer(srcConfigMap, finalization.Finalizer)
+			if err := r.Client.Update(ctx, srcConfigMap, &client.UpdateOptions{}); err != nil {
+				_log.Error(err, "error removing finalizer")
+				return defaultResult, err
+			}
 		}
 	}
 
