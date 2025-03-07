@@ -44,3 +44,10 @@ rules:
   - secrets/finalizers
   verbs:
   - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
