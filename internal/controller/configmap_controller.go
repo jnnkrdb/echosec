@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/jnnkrdb/echosec/pkg/reconcilation/finalization"
+	"github.com/jnnkrdb/echosec/pkg/reconcilation/objects/configmap"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -47,36 +48,45 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return defaultResult, err
 	}
 
-	// check if the obj contains the finalizer
-	if err := finalization.Check(ctx, r.Client, srcConfigMap); err != nil {
+	// handle finalization tasks
+	if finalized, err := configmap.Finalize(ctx, r.Client, srcConfigMap); err != nil {
+		return defaultResult, err
+	} else if finalized {
+		return ctrl.Result{}, nil
+	}
+
+	// clone the content of the object into other namespaces
+	var existing_namespaces = &corev1.NamespaceList{}
+	if err := r.Client.List(ctx, existing_namespaces, &client.ListOptions{}); err != nil {
 		return defaultResult, err
 	}
 
-	// finalize if requested
-	if srcConfigMap.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(srcConfigMap, finalization.Finalizer) {
+	for _, current_namespace := range existing_namespaces.Items {
 
 		var (
-			configmaps      = &corev1.ConfigMapList{}
-			successful bool = false
+			_tmpCM          = &corev1.ConfigMap{}
+			_namespacedName = types.NamespacedName{Namespace: current_namespace.Name, Name: srcConfigMap.Name}
+			_tmpLog         = _log.WithValues("namespace", current_namespace.Name, "requested.cm", _namespacedName.String())
 		)
-		if err := r.Client.List(ctx, configmaps, &client.ListOptions{}); err != nil {
-			return defaultResult, err
+
+		_tmpLog.Info("checking namespace")
+
+		_err := r.Client.Get(ctx, _namespacedName, _tmpCM, &client.GetOptions{})
+
+		switch {
+
+		case _err == nil: // if it exists, check if it should be updated
+			_tmpLog.Info("configmap does already exist in namespace")
+
+			// TODO: implement an update configmap method
+
+		case errors.IsNotFound(_err): // if the item does not exist in the current namespace, then check if it should be created
+			_tmpLog.Info("configmap does not exist in namespace")
+
+			// TODO: implement an create configmap method
 		}
 
-		for _, item := range configmaps.Items {
-			_log.Info("checking configmap", "namespace", item.Namespace, "name", item.Name)
-
-			// TODO: implement code for finalization
-		}
-
-		// after finalization remove the finalizer from the object
-		if successful {
-			controllerutil.RemoveFinalizer(srcConfigMap, finalization.Finalizer)
-			if err := r.Client.Update(ctx, srcConfigMap, &client.UpdateOptions{}); err != nil {
-				_log.Error(err, "error removing finalizer")
-				return defaultResult, err
-			}
-		}
+		// TODO: Implement synchronization into other namespaces
 	}
 
 	return defaultResult, nil
