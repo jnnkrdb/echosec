@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/jnnkrdb/echosec/pkg/reconcilation/objects/configmap"
+	"github.com/jnnkrdb/echosec/pkg/reconcilation/regx"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -64,29 +66,48 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	for _, current_namespace := range existing_namespaces.Items {
 
 		var (
-			_tmpCM          = &corev1.ConfigMap{}
-			_namespacedName = types.NamespacedName{Namespace: current_namespace.Name, Name: srcConfigMap.Name}
-			_tmpLog         = _log.WithValues("namespace", current_namespace.Name, "requested.cm", _namespacedName.String())
+			_tmpCM                = &corev1.ConfigMap{}
+			_namespacedName       = types.NamespacedName{Namespace: current_namespace.Name, Name: srcConfigMap.Name}
+			_tmpLog               = _log.WithValues("namespace", current_namespace.Name, "requested.cm", _namespacedName.String())
+			_shouldExist    bool  = false
+			_err            error = nil
 		)
 
 		_tmpLog.Info("checking namespace")
 
-		_err := r.Client.Get(ctx, _namespacedName, _tmpCM, &client.GetOptions{})
+		// check if the item should exist in this namespace
+		if _shouldExist, _err = regx.ShouldExistInNamespace(srcConfigMap.Annotations, current_namespace.Name); _err != nil {
+			_tmpLog.Error(_err, "error calculating namespace existence")
+			return defaultResult, _err
+		}
+
+		_err = r.Client.Get(ctx, _namespacedName, _tmpCM, &client.GetOptions{})
 
 		switch {
 
-		case _err == nil: // if it exists, check if it should be updated
-			_tmpLog.Info("configmap does already exist in namespace")
+		case _err == nil && !_shouldExist: // if it exists and should not exist, remove it from the cluster
+			_tmpLog.Info("configmap should not exist in namespace -> deleting")
+
+			if e := r.Client.Delete(ctx, _tmpCM, &client.DeleteOptions{}); e != nil {
+				_tmpLog.Error(e, "error removing item from cluster")
+				return defaultResult, e
+			}
+
+		case _err == nil && _shouldExist: // if it exists and should exist, update the item, if neccessary
+			_tmpLog.Info("configmap does already exist in namespace -> updating")
 
 			// TODO: implement an update configmap method
 
-		case errors.IsNotFound(_err): // if the item does not exist in the current namespace, then check if it should be created
-			_tmpLog.Info("configmap does not exist in namespace")
+		case errors.IsNotFound(_err) && _shouldExist: // if the item does not exist in the current namespace, but should exist, create it
+			_tmpLog.Info("configmap does not exist in namespace -> creating")
+
+			_tmpCM.ObjectMeta = v1.ObjectMeta{
+				Name:      srcConfigMap.Name,
+				Namespace: srcConfigMap.Namespace,
+			}
 
 			// TODO: implement an create configmap method
 		}
-
-		// TODO: Implement synchronization into other namespaces
 	}
 
 	return defaultResult, nil

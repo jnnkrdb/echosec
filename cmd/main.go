@@ -78,11 +78,11 @@ func main() {
 		Cache: cache.Options{
 			SyncPeriod: &syncPeriodMinutes,
 			Namespaces: viper.GetStringSlice("namespaces"),
-			//			DefaultLabelSelector: labels.SelectorFromSet(func() map[string]string {
-			//				var selectorLabels = make(map[string]string)
-			//				selectorLabels[reconcilation.LabelEnableMirror] = "true"
-			//				return selectorLabels
-			//			}()),
+			// DefaultLabelSelector: labels.SelectorFromSet(func() map[string]string {
+			// 	var selectorLabels = make(map[string]string)
+			// 	selectorLabels[reconcilation.LabelEnableMirror] = "true"
+			// 	return selectorLabels
+			// }()),
 		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
