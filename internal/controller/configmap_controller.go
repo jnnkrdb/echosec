@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jnnkrdb/echosec/pkg/reconcilation/objects/configmap"
+	"github.com/jnnkrdb/echosec/pkg/reconcilation/finalization"
 	"github.com/jnnkrdb/echosec/pkg/reconcilation/regx"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
@@ -51,7 +51,7 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// handle finalization tasks
-	if finalized, err := configmap.Finalize(ctx, r.Client, srcConfigMap); err != nil {
+	if finalized, err := finalization.Finalize(ctx, r.Client, srcConfigMap); err != nil {
 		return defaultResult, err
 	} else if finalized {
 		return ctrl.Result{}, nil
