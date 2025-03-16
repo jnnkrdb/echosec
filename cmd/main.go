@@ -25,7 +25,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -77,9 +76,13 @@ func main() {
 		LeaderElection:         true,
 		LeaderElectionID:       "echosec.jnnkrdb.de",
 		Cache: cache.Options{
-			SyncPeriod:           &syncPeriodMinutes,
-			Namespaces:           viper.GetStringSlice("namespaces"),
-			DefaultLabelSelector: labels.SelectorFromSet(viper.GetStringMapString("labels.selector")),
+			SyncPeriod: &syncPeriodMinutes,
+			Namespaces: viper.GetStringSlice("namespaces"),
+			// DefaultLabelSelector: labels.SelectorFromSet(func() map[string]string {
+			// 	var selectorLabels = make(map[string]string)
+			// 	selectorLabels[reconcilation.LabelEnableMirror] = "true"
+			// 	return selectorLabels
+			// }()),
 		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the

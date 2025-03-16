@@ -55,9 +55,4 @@ var configs = []struct {
 		return []string{}
 	}()},
 	{Name: "syncperiodminutes", Value: 10},
-	{Name: "labels.selector", Value: func() map[string]string {
-		var selectorLabels = make(map[string]string)
-		selectorLabels["echosec.jnnkrdb.de/mirror-me"] = "true"
-		return selectorLabels
-	}()},
 }
