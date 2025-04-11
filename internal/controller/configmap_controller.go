@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jnnkrdb/echosec/pkg/reconcilation"
 	"github.com/jnnkrdb/echosec/pkg/reconcilation/finalization"
 	"github.com/jnnkrdb/echosec/pkg/reconcilation/regx"
 	"github.com/spf13/viper"
@@ -38,18 +39,26 @@ type ConfigMapReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var _log = log.FromContext(ctx)
-	var defaultResult = ctrl.Result{RequeueAfter: time.Duration(viper.GetInt("syncperiodminutes")) * time.Minute}
 
-	_log.Info("got item", "name", req.Name, "namespace", req.Namespace)
+	// -----------------------------------------------------------------------------------------------
+	// preparing objects and variables for the reconcilation
+	var _log = log.FromContext(ctx).WithValues("req.Name", req.Name, "req.Namespace", req.Namespace)
+	var defaultResult = ctrl.Result{RequeueAfter: time.Duration(viper.GetInt("syncperiodminutes")) * time.Minute}
+	_log.Info("got item")
 
 	var srcConfigMap = &corev1.ConfigMap{}
-
 	if err := r.Client.Get(ctx, req.NamespacedName, srcConfigMap, &client.GetOptions{}); err != nil {
 		_log.Error(err, "error receiving configmap from cluster")
 		return defaultResult, err
 	}
 
+	// -----------------------------------------------------------------------------------------------
+	// check for required annotations, to determine whether the object should be reconciled or ignored
+	if reconcilation.SourceOrCopy(srcConfigMap.Annotations) == reconcilation.ObjectIsNONE {
+		_log.Info("item is no source or copy object, skipping")
+	}
+
+	// -----------------------------------------------------------------------------------------------
 	// handle finalization tasks
 	if finalized, err := finalization.Finalize(ctx, r.Client, srcConfigMap); err != nil {
 		return defaultResult, err
@@ -57,6 +66,7 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
+	// -----------------------------------------------------------------------------------------------
 	// clone the content of the object into other namespaces
 	var existing_namespaces = &corev1.NamespaceList{}
 	if err := r.Client.List(ctx, existing_namespaces, &client.ListOptions{}); err != nil {
