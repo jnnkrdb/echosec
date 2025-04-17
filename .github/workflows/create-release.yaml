@@ -2,17 +2,11 @@ name: BUILD ECHOSEC RELEASE
 
 on:
   push:
-    branches:
-      - master
-      - dev
     paths-ignore:
       - '.devcontainer/**'
       - '.github/docs/**'
       - 'README.md'
       - 'LICENSE'
-  pull_request:
-    branches: 
-      - master 
 
 jobs:
   version:
@@ -33,9 +27,6 @@ jobs:
       - name: Determine Version
         id:   gitversion # id to later be referenced
         uses: gittools/actions/gitversion/execute@v0
-        #with:
-        #  useConfigFile: true
-        #  configFilePath: .github/gitversion/GitVersion.yml
       
       - id: version
         run: echo "semver=${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_OUTPUT
@@ -74,18 +65,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHP_TOKEN }}
 
-      - name: Build Image With Push - Dev
+      - name: Build Image With Push
         uses: docker/build-push-action@v5
-        if: github.ref == 'refs/heads/dev'
-        with:
-          context: "."
-          file: ${{ env.DOCKERFILE }}
-          tags: ${{ env.REPOSITORY }}:dev
-          push: true
-
-      - name: Build Image With Push - Prod
-        uses: docker/build-push-action@v5
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         with:
           context: "."
           file: ${{ env.DOCKERFILE }}
