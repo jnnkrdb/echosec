@@ -120,8 +120,6 @@ jobs:
           
       - name: Git Clone HelmChart Repo
         run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git clone https://${{ secrets.HELM_UPLOAD }}@github.com/jnnkrdb/helm /tmp/helm
           ls -lah
 
@@ -132,6 +130,8 @@ jobs:
         run: | 
           cd /tmp/helm
           helm repo index --url $HELM_URL .
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git add .
           git commit -m "added helmchart echosec: [${{ needs.version.outputs.semver }}]  | $(date +"%Y-%m-%d - %H:%M:%S")"
           git push
