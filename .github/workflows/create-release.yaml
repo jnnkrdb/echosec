@@ -54,7 +54,8 @@ jobs:
 
       - name: bash-version
         run: |
-          echo ${{ needs.version.outputs.semver }} > ./opt/echosec/VERSION
+          echo SemVer: ${{ needs.version.outputs.semver }} > ./opt/echosec/VERSION 
+          echo Ref: ${{ github.ref_name }} >> ./opt/echosec/VERSION
           echo $(cat './opt/echosec/VERSION')
 
       - name: Build Image Without Push
@@ -63,7 +64,7 @@ jobs:
         with:
           context: "."
           file: ${{ env.DOCKERFILE }}
-          #tags: ${{ env.REPOSITORY }}:latest,${{ env.REPOSITORY }}:${{ needs.version.outputs.semver }}
+          #tags: ${{ env.REPOSITORY }}:latest,${{ env.REPOSITORY }}:${{ github.ref_name }}
           push: false
       
       - name: Login to Github Packages
@@ -88,7 +89,7 @@ jobs:
         with:
           context: "."
           file: ${{ env.DOCKERFILE }}
-          tags: ${{ env.REPOSITORY }}:latest,${{ env.REPOSITORY }}:${{ needs.version.outputs.semver }}
+          tags: ${{ env.REPOSITORY }}:latest,${{ env.REPOSITORY }}:${{ github.ref_name }}
           push: true
 
   helm:
@@ -96,47 +97,42 @@ jobs:
     runs-on: ubuntu-latest
     env:
       #HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
-      HELM_DIR: ./.helm/echosec
+      HELM_DIR: .helm/
+      HELM_URL: https://jnnkrdb.github.io/helm/
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
+      - name: Check for changes
+        run: |
+          if [ "" = "$(git diff --name-status HEAD~ .helm/)" ]; then
+            echo "NO changes made, skipping helm"
+            return 0
+          fi
+
       - name: Lint
         run: helm lint $HELM_DIR
       
       - name: Template
         run: helm template $HELM_DIR --debug
-
-      - name: Configure Git
+          
+      - name: Git Clone HelmChart Repo
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git clone https://${{ secrets.HELM_UPLOAD }}@github.com/helm /tmp
+          ls -lah
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.7.0
-        with:
-          charts_dir: .helm
-          skip_existing: true
-        env:
-          CR_TOKEN: "${{ secrets.GHP_TOKEN }}"
+      - name: Package
+        run: helm package $HELM_DIR --version ${{ needs.version.outputs.semver }} --app-version ${{ github.ref_name }} -d /tmp/helm/charts
 
-#      - name: Package - Dev
-#        if: github.ref == 'refs/heads/dev'
-#        run: helm package $HELM_DIR --version ${{ needs.version.outputs.semver }}
-#
-#      - name: Package - Prod
-#        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-#        run: helm package $HELM_DIR --version ${{ needs.version.outputs.semver }} --app-version ${{ needs.version.outputs.semver }}
-#      
-#      - name: Login to Github Packages
-#        uses: docker/login-action@v2
-#        with:
-#          registry: ghcr.io
-#          username: ${{ github.actor }}
-#          password: ${{ secrets.GHP_TOKEN }}
-#          
-#      - name: Upload
-#        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
-#        run: helm push "echosec-${{ needs.version.outputs.semver }}.tgz" "oci://ghcr.io/jnnkrdb"        
+      - name: Create Index
+        run: | 
+          cd /tmp/helm
+          helm repo index --url $HELM_URL .
+          git add .
+          git commit -m "added helmchart echosec: [${{ needs.version.outputs.semver }}]  | $(date +"%Y-%m-%d - %H:%M:%S")"
+          git push
+          
