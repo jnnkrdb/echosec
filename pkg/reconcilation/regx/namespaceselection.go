@@ -1,42 +1,43 @@
 package regx
 
 import (
+	"encoding/json"
 	"regexp"
-	"strings"
 
 	"github.com/jnnkrdb/echosec/pkg/reconcilation"
 )
 
 /*
 The selector will be parsed from the sources objects annotations. It contains the information about the actual calculation
-of the desired namespaces.
+of the desired namespaces. Here is an example, made with a configmap:
 
-The annotation struct will look something like this:
-
+	apiVersion: v1
+	kind: ConfigMap
 	metadata:
 		annotations:
-			echosec.jnnkrdb.de/rgx.avoid: "<regex-1>;<regex-2>;<regex-3>"
-			echosec.jnnkrdb.de/rgx.match: "<regex-4>;<regex-5>;<regex-6>"
+		  echosec.jnnkrdb.de/rgx.config: |
+			  { "avoid": [ "<regex-1>", "<regex-2>" ], "match": [ "<regex-3>", "<regex-4>" ] }
+		name: echosec-regex-test
+	data:
+		testvalue: "empty"
 */
-// should an object exist in the given namespace?
 func ShouldExistInNamespace(annotations map[string]string, namespace string) (bool, error) {
 
-	var (
+	var rgxConf = struct {
 		// this list contains all regex strings, to calculate the
 		// namespaces, in which an object should not exist
-		avoids []string
+		Avoid []string `json:"avoid"`
 
 		// this list contains all regex string, to calculate the
 		// namespaces, in which the object should exist
-		matches []string
-	)
-	// receive the lists from the annotations
-	if tmpAvoids, ok := annotations[reconcilation.AnnotationRegexAvoid]; ok {
-		avoids = strings.Split(strings.Trim(tmpAvoids, ";"), ";")
-	}
+		Match []string `json:"match"`
+	}{}
 
-	if tmpMatches, ok := annotations[reconcilation.AnnotationRegexMatch]; ok {
-		matches = strings.Split(strings.Trim(tmpMatches, ";"), ";")
+	// receive the object from the annotations
+	if tmpAvoids, ok := annotations[reconcilation.AnnotationRegexConfig]; ok {
+		if err := json.Unmarshal([]byte(tmpAvoids), &rgxConf); err != nil {
+			return false, err
+		}
 	}
 
 	// calculates two collections of namespaces, which should weither be avoided
@@ -65,14 +66,14 @@ func ShouldExistInNamespace(annotations map[string]string, namespace string) (bo
 
 	// check if the namespace appears in the avoids regex list, if an error occurs or
 	// the list contains the namespace, then return a false value with the error (error/nil)
-	if c, err := contains(avoids, namespace); err != nil || c {
+	if c, err := contains(rgxConf.Avoid, namespace); err != nil || c {
 		return false, err
 	}
 
 	// if no error occured and the avoids list does not contain the namespace, check if
 	// the matches list contains the namespace. if so, or an error occurs, then return the
 	// given error if any and the true value
-	if c, err := contains(matches, namespace); err != nil || c {
+	if c, err := contains(rgxConf.Match, namespace); err != nil || c {
 		return true, err
 	}
 

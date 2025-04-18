@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jnnkrdb/echosec/pkg/reconcilation"
@@ -46,81 +47,110 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	var defaultResult = ctrl.Result{RequeueAfter: time.Duration(viper.GetInt("syncperiodminutes")) * time.Minute}
 	_log.Info("got item")
 
-	var srcConfigMap = &corev1.ConfigMap{}
-	if err := r.Client.Get(ctx, req.NamespacedName, srcConfigMap, &client.GetOptions{}); err != nil {
-		_log.Error(err, "error receiving configmap from cluster")
+	var reconcilationObject = &corev1.ConfigMap{}
+	if err := r.Client.Get(ctx, req.NamespacedName, reconcilationObject, &client.GetOptions{}); err != nil {
+		_log.Error(err, "error receiving object from cluster")
 		return defaultResult, err
 	}
 
 	// -----------------------------------------------------------------------------------------------
 	// check for required annotations, to determine whether the object should be reconciled or ignored
-	if reconcilation.SourceOrCopy(srcConfigMap.Annotations) == reconcilation.ObjectIsNONE {
-		_log.Info("item is no source or copy object, skipping")
-	}
+	objecttype := reconcilation.SourceOrCopy(reconcilationObject.Annotations)
 
-	// -----------------------------------------------------------------------------------------------
 	// handle finalization tasks
-	if finalized, err := finalization.Finalize(ctx, r.Client, srcConfigMap); err != nil {
+	if finalized, err := finalization.Finalize(ctx, r.Client, reconcilationObject, objecttype); err != nil {
 		return defaultResult, err
 	} else if finalized {
 		return ctrl.Result{}, nil
 	}
 
-	// -----------------------------------------------------------------------------------------------
-	// clone the content of the object into other namespaces
-	var existing_namespaces = &corev1.NamespaceList{}
-	if err := r.Client.List(ctx, existing_namespaces, &client.ListOptions{}); err != nil {
-		return defaultResult, err
-	}
+	switch objecttype {
 
-	for _, current_namespace := range existing_namespaces.Items {
+	default: // ------------------------------------------------------------------------------------------------- handle unplausible objects (logically there cant be any)
+		e := fmt.Errorf("object type (%d) is unplausible", objecttype)
+		_log.Error(e, "error receiving object from cluster")
+		return defaultResult, e
 
-		var (
-			_tmpCM                = &corev1.ConfigMap{}
-			_namespacedName       = types.NamespacedName{Namespace: current_namespace.Name, Name: srcConfigMap.Name}
-			_tmpLog               = _log.WithValues("namespace", current_namespace.Name, "requested.cm", _namespacedName.String())
-			_shouldExist    bool  = false
-			_err            error = nil
-		)
+	case reconcilation.ObjectIsNONE: // ------------------------------------------------------------------------------------------------- handle unregistered objects
 
-		_tmpLog.Info("checking namespace")
+		_log.Info("item is no source or copy object, skipping")
+		return ctrl.Result{}, nil
 
-		// check if the item should exist in this namespace
-		if _shouldExist, _err = regx.ShouldExistInNamespace(srcConfigMap.Annotations, current_namespace.Name); _err != nil {
-			_tmpLog.Error(_err, "error calculating namespace existence")
-			return defaultResult, _err
+	case reconcilation.ObjectIsCOPY: // ------------------------------------------------------------------------------------------------- handle copy objects
+
+		_log.Info("copy object reconcilation not implemented")
+		return ctrl.Result{}, nil
+
+	case reconcilation.ObjectIsSOURCE: // ----------------------------------------------------------------------------------------------- handle source objects
+
+		var existing_namespaces = &corev1.NamespaceList{}
+		if err := r.Client.List(ctx, existing_namespaces, &client.ListOptions{}); err != nil {
+			return defaultResult, err
 		}
 
-		_err = r.Client.Get(ctx, _namespacedName, _tmpCM, &client.GetOptions{})
+		for _, current_namespace := range existing_namespaces.Items {
 
-		switch {
+			var (
+				_tmpObject            = &corev1.ConfigMap{}
+				_namespacedName       = types.NamespacedName{Namespace: current_namespace.Name, Name: reconcilationObject.Name}
+				_tmpLog               = _log.WithValues("namespace/name", _namespacedName.String())
+				_shouldExist    bool  = false
+				_err            error = nil
+			)
 
-		case _err == nil && !_shouldExist: // if it exists and should not exist, remove it from the cluster
-			_tmpLog.Info("configmap should not exist in namespace -> deleting")
+			_tmpLog.Info("checking namespace")
 
-			if e := r.Client.Delete(ctx, _tmpCM, &client.DeleteOptions{}); e != nil {
-				_tmpLog.Error(e, "error removing item from cluster")
-				return defaultResult, e
+			// check if the item should exist in this namespace
+			if _shouldExist, _err = regx.ShouldExistInNamespace(reconcilationObject.Annotations, current_namespace.Name); _err != nil {
+				_tmpLog.Error(_err, "error calculating namespace existence")
+				return defaultResult, _err
 			}
 
-		case _err == nil && _shouldExist: // if it exists and should exist, update the item, if neccessary
-			_tmpLog.Info("configmap does already exist in namespace -> updating")
+			_err = r.Client.Get(ctx, _namespacedName, _tmpObject, &client.GetOptions{})
 
-			// TODO: implement an update configmap method
+			switch {
 
-		case errors.IsNotFound(_err) && _shouldExist: // if the item does not exist in the current namespace, but should exist, create it
-			_tmpLog.Info("configmap does not exist in namespace -> creating")
+			case _err == nil && !_shouldExist: // if it exists and should not exist, remove it from the cluster
+				_tmpLog.Info("configmap should not exist in namespace -> deleting")
 
-			_tmpCM.ObjectMeta = v1.ObjectMeta{
-				Name:      srcConfigMap.Name,
-				Namespace: srcConfigMap.Namespace,
+				if e := r.Client.Delete(ctx, _tmpObject, &client.DeleteOptions{}); e != nil {
+					_tmpLog.Error(e, "error removing item from cluster")
+					return defaultResult, e
+				}
+
+			case _err == nil && _shouldExist: // if it exists and should exist, update the item, if neccessary
+				_tmpLog.Info("configmap does already exist in namespace -> updating")
+
+				_tmpObject.Data = reconcilationObject.Data
+
+				if e := r.Client.Update(ctx, _tmpObject, &client.UpdateOptions{}); e != nil {
+					_tmpLog.Error(e, "error updating copy object")
+					return defaultResult, e
+				}
+
+			case errors.IsNotFound(_err) && _shouldExist: // if the item does not exist in the current namespace, but should exist, create it
+				_tmpLog.Info("configmap does not exist in namespace -> creating")
+
+				_tmpObject.ObjectMeta = v1.ObjectMeta{
+					Name:      reconcilationObject.Name,
+					Namespace: reconcilationObject.Namespace,
+				}
+
+				_tmpObject.Data = reconcilationObject.Data
+				_tmpObject.Finalizers = []string{finalization.Finalizer}
+				var lbls = make(map[string]string)
+				lbls[reconcilation.AnnotationSourceObject] = string(reconcilationObject.GetUID())
+				_tmpObject.Labels = lbls
+
+				if e := r.Client.Create(ctx, _tmpObject, &client.CreateOptions{}); e != nil {
+					_tmpLog.Error(e, "error creating copy object")
+					return defaultResult, e
+				}
 			}
-
-			// TODO: implement an create configmap method
 		}
-	}
 
-	return defaultResult, nil
+		return defaultResult, nil
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
