@@ -37,3 +37,12 @@ pod:
 #  namespaces: 
 #    - default 
 #  syncperiodminutes: 5
+
+# Testing the regex configuration on testing configmap or secret
+testobjects:
+  cmAnnotations:
+#    echosec.jnnkrdb.de/rgx.config: |
+#      { "avoid": [ "<regex-1>", "<regex-2>" ], "match": [ "<regex-3>", "<regex-4>" ] }
+  secAnnotations:
+#    echosec.jnnkrdb.de/rgx.config: |
+#      { "avoid": [ "<regex-1>", "<regex-2>" ], "match": [ "<regex-3>", "<regex-4>" ] }

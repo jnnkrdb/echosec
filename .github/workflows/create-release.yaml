@@ -29,7 +29,7 @@ jobs:
         uses: gittools/actions/gitversion/execute@v0
       
       - id: version
-        run: echo "semver=${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_OUTPUT
+        run: echo "semver=${{ steps.gitversion.outputs.fullSemVer }}" >> $GITHUB_OUTPUT
 
   build:
     needs: version
