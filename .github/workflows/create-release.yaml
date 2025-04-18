@@ -12,7 +12,7 @@ jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
-      semver: ${{ steps.gitversion.outputs.semVer }}
+      semver: ${{ steps.gitversion.outputs.fullSemVer }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
