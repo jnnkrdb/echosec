@@ -1,0 +1,12 @@
+mode: Mainline
+branches:
+  main:
+    regex: ^master$|^main$
+    tag: ''
+    increment: Patch
+  pull-request:
+    regex: ^(pull|pull\-requests|pr)[/-]
+    tag: 'pr'
+ignore:
+  sha: []
+merge-message-formats: {}
