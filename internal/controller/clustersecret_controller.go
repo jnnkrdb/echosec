@@ -104,7 +104,7 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		*/
 
-		var shouldExist, doesExist bool = true, true
+		var shouldExist, doesExist bool
 		// should the item exist ?
 		if se, err := recObj.Spec.RegexRules.ShouldExistInNamespace(requestedSecret.Namespace); err != nil {
 			nsLog.Error(err, "error calculating wether the item should exist or not")
@@ -122,7 +122,10 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				continue
 			}
 			doesExist = false
+		} else {
+			doesExist = true
 		}
+
 		// update log with new values
 		nsLog = nsLog.WithValues("shouldExist", shouldExist, "doesExist", doesExist)
 
@@ -136,7 +139,7 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// set the owners reference
 		// this is required for watching the dependent objects
 		if err := controllerutil.SetControllerReference(recObj, tempSecret, r.Scheme); err != nil {
-			nsLog.Error(err, "unable to set owners reference, stopping reconcilation")
+			nsLog.Error(err, "unable to set owners reference, stopping reconciliation")
 			return ctrl.Result{}, err
 		}
 
