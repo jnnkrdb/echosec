@@ -16,53 +16,15 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	"context"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-)
-
 // get the name, which should be used for the dependent items
-func (sj ClusterSecret) GetDependentsName() string {
-	if sj.Spec.SecretName == nil {
-		return sj.Name
-	}
-	return *sj.Spec.SecretName
+func (cs ClusterSecret) GetDependentsName() string {
+	return cs.getDependentsName()
 }
 
-// handle deletion process
-func (sj *ClusterSecret) Finalize(ctx context.Context, c client.Client) (bool, error) {
-	var _log = log.FromContext(ctx)
-
-	_log.Info("checking object deletion request")
-	if sj.DeletionTimestamp.IsZero() {
-
-		// check if the finalizer is set
-		_log.Info("object is not requested to be deleted, adding finalizer if required")
-		if !controllerutil.ContainsFinalizer(sj, Finalizer) {
-			controllerutil.AddFinalizer(sj, Finalizer)
-			if err := c.Update(ctx, sj); err != nil {
-				_log.Error(err, "error updating object in cluster")
-				return false, err
-			}
-		}
-
-		return false, nil
+// get the name, which should be used for the dependent items
+func (cs ClusterSecret) getDependentsName() string {
+	if cs.Spec.SecretName == nil {
+		return cs.Name
 	}
-
-	// maybe this is not needed due to the owner references
-	/*
-		// create the delete options with the correct label selector
-		var deleteAllOptions = &client.DeleteAllOfOptions{}
-		deleteAllOptions.LabelSelector = ObjectsLabelSelector(sj.GetUID())
-
-		// remove all items from the cluster
-		if err := c.DeleteAllOf(ctx, &corev1.Secret{}, deleteAllOptions); err != nil {
-			_log.Error(err, "error removing all objects from cluster with specific labelselector", "labelselector", deleteAllOptions.LabelSelector)
-			return false, err
-		}
-	*/
-	return false, nil
+	return *cs.Spec.SecretName
 }

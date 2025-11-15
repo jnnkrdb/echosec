@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -42,7 +43,6 @@ type ClusterSecretReconciler struct {
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -67,19 +67,6 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{}, err
 	}
-
-	// handle finalization if required
-	/*
-		if deleted, err := recObj.Finalize(log.IntoContext(ctx, _log.V(3)), r.Client); err != nil {
-			_log.Error(err, "error handling deletion request")
-			return ctrl.Result{}, err
-
-		} else if deleted {
-
-			_log.Info("clustersecret deleted from cluster")
-			return ctrl.Result{}, nil
-		}
-	*/
 
 	// -------------------------------------------------------- item handling
 
@@ -196,8 +183,7 @@ func (r *ClusterSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&clusterv1alpha1.ClusterSecret{}).
 		Named("clustersecret").
+		Owns(&corev1.Secret{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.Namespace{}).
 		Complete(r)
 }
