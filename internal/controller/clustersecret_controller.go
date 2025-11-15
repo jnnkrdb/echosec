@@ -56,7 +56,7 @@ type ClusterSecretReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var _log = log.FromContext(ctx).WithValues("req.Name", req.Name, "req.Namespac+e", req.Namespace)
+	var _log = log.FromContext(ctx).WithValues("reqested-item", req)
 
 	// -------------------------------------------------------- meta handling
 	// receive the object, which should be reconciled
