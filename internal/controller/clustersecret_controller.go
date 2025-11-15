@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,6 +42,7 @@ type ClusterSecretReconciler struct {
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -189,7 +189,12 @@ func (r *ClusterSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&clusterv1alpha1.ClusterSecret{}).
 		Named("clustersecret").
-		Owns(&corev1.Secret{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithEventFilter(
+			predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicate.ResourceVersionChangedPredicate{},
+			),
+		).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }
