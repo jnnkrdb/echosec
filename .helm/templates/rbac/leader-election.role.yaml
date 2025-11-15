@@ -3,18 +3,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   labels:
-    helm.sh/chart: {{ include "echosec.chart" . }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    {{- with .Values.rbac.labels }}
-      {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- include "echosec.labels" . | nindent 4 }}
+    {{- include "common.labels" ( dict "labels" (list .Values.global.labels .Values.labels) ) | nindent 4 }}
   annotations:
     jnnkrdb.de/src: github.com/jnnkrdb/echosec
-    {{- with .Values.rbac.annotations }}
-      {{- toYaml . | nindent 4 }}
-    {{- end }}
-  name: echosec-election-role
+    {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations .Values.annotations) ) | nindent 4 }}
+  name: {{ include "echosec.fullname" . }}-election-role
 rules:
 - apiGroups:
   - ""
