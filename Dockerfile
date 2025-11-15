@@ -1,51 +1,35 @@
-# ---------------------------------------------------------------------------------------------- Golang
-# Building the go binary
-#FROM golang:1.19 AS operator
-#FROM golang:1.23 AS operator
-FROM golang:1.20 AS operator
-WORKDIR /echosec-src
-# copy the code files
-COPY pkg/ /echosec-src/pkg
-COPY cmd/ /echosec-src/cmd
-COPY api/ /echosec-src/api
-COPY internal/controller/ /echosec-src/internal/controller
+# Build the manager binary
+FROM golang:1.24 AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
-COPY go.mod /echosec-src/go.mod
-COPY go.sum /echosec-src/go.sum
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
 
-# set env vars
-ENV CGO_ENABLED=0
-ENV GOARCH=amd64
-ENV GOOS=linux
+# Copy the Go source (relies on .dockerignore to filter)
+COPY . .
 
-# START BUILD
-RUN go mod download && go build -o /echosec cmd/main.go
+# Build
+# the GOARCH has no default value to allow the binary to be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o echosec cmd/main.go
 
-# ---------------------------------------------------------------------------------------------- Final Alpine
-FROM alpine:3.19
-LABEL org.opencontainers.image.source="https://github.com/jnnkrdb/echosec"
-LABEL org.opencontainers.image.description="Operator for cluster-wide mirroring of secrets/configmaps."
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:nonroot
+ARG VERSION_ARG="latest"
+LABEL org.opencontainers.image.source=https://github.com/jnnkrdb/echosec
+
 WORKDIR /
+COPY --from=builder /workspace/echosec .
+ENV VERSION=${VERSION_ARG}
+USER 65532:65532
 
-# install neccessary binaries
-RUN apk add --no-cache --update openssl
-
-# Copy the echosec Directory Contents
-COPY opt/ /opt
-
-# create vault user with home dir
-RUN addgroup -S echosec && adduser -S echosec -H -h /opt/echosec -s /bin/sh -G echosec -u 3453
-
-# Copy Operators Binary
-COPY --from=operator /echosec /usr/local/bin/echosec
-RUN chmod 700 /usr/local/bin/echosec &&\
-    chmod 700 -R /opt/echosec &&\
-    chown echosec:echosec /usr/local/bin/echosec &&\
-    chown echosec:echosec -R /opt/echosec
-    
-# change user to echosec user
-USER echosec:echosec
-
-# set the entrypoints
-ENTRYPOINT ["/opt/echosec/entrypoint.sh"]
-CMD [ "echosec" ]
+ENTRYPOINT ["/echosec"]
