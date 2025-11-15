@@ -86,7 +86,6 @@ type ClusterSecretStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:shortName=csec;csecs
 
 // ClusterSecret is the Schema for the clustersecrets API
 type ClusterSecret struct {
