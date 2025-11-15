@@ -1,4 +1,5 @@
 name: Garbage Collection
+
 on:
   schedule:
     - cron: '0 0 */7 * *' # every 7th day on 00:00

@@ -25,8 +25,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -196,6 +198,23 @@ func (r *ClusterSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			),
 		).
 		Owns(&corev1.Secret{}).
-		Owns(&corev1.Namespace{}).
+		Watches(
+			&corev1.Namespace{},
+			handler.EnqueueRequestsFromMapFunc(
+				func(ctx context.Context, obj client.Object) (requests []reconcile.Request) {
+					var _log = log.FromContext(ctx)
+					// trigger reconciliation for all clustersecrets
+					var list = &clusterv1alpha1.ClusterSecretList{}
+					if err := mgr.GetClient().List(ctx, list, &client.ListOptions{}); err != nil {
+						_log.Error(err, "error receiving list of clustersecrets, cannot invoke reconciliation")
+						return
+					}
+					for _, cs := range list.Items {
+						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Name: cs.Name}})
+					}
+					return
+				},
+			),
+		).
 		Complete(r)
 }
