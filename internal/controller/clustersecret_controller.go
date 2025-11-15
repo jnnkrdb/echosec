@@ -56,7 +56,7 @@ type ClusterSecretReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var _log = log.FromContext(ctx).WithValues("reqested-item", req)
+	var _log = log.FromContext(ctx)
 
 	// -------------------------------------------------------- meta handling
 	// receive the object, which should be reconciled
@@ -127,6 +127,8 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		nsLog = nsLog.WithValues("shouldExist", shouldExist, "doesExist", doesExist)
 
 		// update the values of the tempSecret (only really needed for creating or updating)
+		tempSecret.Name = requestedSecret.Name
+		tempSecret.Namespace = requestedSecret.Namespace
 		tempSecret.Data = recObj.Spec.Data
 		tempSecret.StringData = recObj.Spec.StringData
 		tempSecret.Type = recObj.Spec.Type
