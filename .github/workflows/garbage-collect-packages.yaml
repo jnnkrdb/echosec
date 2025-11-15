@@ -1,0 +1,18 @@
+name: Garbage Collection
+on:
+  schedule:
+    - cron: '0 0 */7 * *' # every 7th day on 00:00
+
+jobs:
+  garbage-collection:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove Images
+        uses: actions/delete-package-versions@v5
+        with: 
+          token: ${{ secrets.GHP_TOKEN }}
+          package-name: 'echosec'
+          package-type: 'container'
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: 'true'
