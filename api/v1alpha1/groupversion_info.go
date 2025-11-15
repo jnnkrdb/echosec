@@ -20,7 +20,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
@@ -34,3 +36,15 @@ var (
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
 )
+
+// finalization and garbage collection
+const Finalizer string = "v1alpha1.cluster.jnnkrdb.de/finalizer"
+const LabelSourceObject string = "echosec.jnnkrdb.de/src.object"
+
+// creating labeselector, to receive all objects, which were cloned
+// from the uid's source object
+func ObjectsLabelSelector(uid types.UID) labels.Selector {
+	var labelSelector map[string]string = make(map[string]string)
+	labelSelector[LabelSourceObject] = string(uid)
+	return labels.SelectorFromSet(labelSelector)
+}
