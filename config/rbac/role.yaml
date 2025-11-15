@@ -7,14 +7,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - secrets
   verbs:
   - create
@@ -24,16 +16,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets/status
-  verbs:
-  - create
-  - delete
-  - get
-  - patch
-  - update
 - apiGroups:
   - cluster.jnnkrdb.de
   resources:

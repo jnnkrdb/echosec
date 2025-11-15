@@ -86,6 +86,12 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		nsLog := _log.V(3).WithValues("requested-secret", requestedSecret)
 		nsLog.Info("check item in namespace")
 
+		// ignore namespace if marked for deletion
+		if !namespace.DeletionTimestamp.IsZero() {
+			nsLog.Info("namespace marked for deletion -> ignore")
+			continue
+		}
+
 		/*
 			following cases should be considered:
 			1. secret should not exist and does not exist -> ignore
