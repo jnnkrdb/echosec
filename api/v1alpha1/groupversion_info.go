@@ -44,7 +44,7 @@ const LabelSourceObject string = "echosec.jnnkrdb.de/src.object"
 // creating labeselector, to receive all objects, which were cloned
 // from the uid's source object
 func ObjectsLabelSelector(uid types.UID) labels.Selector {
-	var labelSelector map[string]string = make(map[string]string)
+	var labelSelector = make(map[string]string)
 	labelSelector[LabelSourceObject] = string(uid)
 	return labels.SelectorFromSet(labelSelector)
 }
