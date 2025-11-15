@@ -62,20 +62,25 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// receive the object, which should be reconciled
 	var recObj = &clusterv1alpha1.ClusterSecret{}
 	if err := r.Get(ctx, req.NamespacedName, recObj, &client.GetOptions{}); err != nil {
-		_log.Error(err, "error fetching object from cluster")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		err = client.IgnoreNotFound(err)
+		if err != nil {
+			_log.Error(err, "error fetching object from cluster")
+		}
+		return ctrl.Result{}, err
 	}
 
 	// handle finalization if required
-	if deleted, err := recObj.Finalize(log.IntoContext(ctx, _log.V(3)), r.Client); err != nil {
-		_log.Error(err, "error handling deletion request")
-		return ctrl.Result{}, err
+	/*
+		if deleted, err := recObj.Finalize(log.IntoContext(ctx, _log.V(3)), r.Client); err != nil {
+			_log.Error(err, "error handling deletion request")
+			return ctrl.Result{}, err
 
-	} else if deleted {
+		} else if deleted {
 
-		_log.Info("clustersecret deleted from cluster")
-		return ctrl.Result{}, nil
-	}
+			_log.Info("clustersecret deleted from cluster")
+			return ctrl.Result{}, nil
+		}
+	*/
 
 	// -------------------------------------------------------- item handling
 
