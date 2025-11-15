@@ -54,6 +54,7 @@ spec:
       containers:
         - name: manager
           image: controller:latest
+          imagePullPolicy: Always
           #command: []
           #args: []
           ports: 
