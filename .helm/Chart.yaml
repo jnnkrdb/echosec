@@ -3,4 +3,11 @@ name: echosec
 description: Deploy EchoSec Operator for cluster-wide configmap and secret mirroring.
 type: application
 version: 0.1.0
-icon: https://jnnkrdb.github.io/helm/icons/echosec.ico
+home: https://github.com/jnnkrdb/echosec
+appVersion: master
+maintainers:
+  - name: jnnkrdb
+keywords:
+  - mirroring
+  - clustersecrets
+  - clusterconfigs

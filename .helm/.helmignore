@@ -21,3 +21,6 @@
 .idea/
 *.tmproj
 .vscode/
+
+# ignore test files
+ignore/
