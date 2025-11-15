@@ -62,7 +62,7 @@ func (nrr NamespaceRegexRules) ShouldExistInNamespace(namespace string) (bool, e
 		return false, err
 	}
 
-	// if no error occured and the avoids list does not contain the namespace, check if
+	// if no error occurred and the avoids list does not contain the namespace, check if
 	// the matches list contains the namespace. if so, or an error occurs, then return the
 	// given error if any and the true value
 	if c, err := contains(nrr.Match, namespace); err != nil || c {
