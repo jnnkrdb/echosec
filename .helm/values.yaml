@@ -6,6 +6,8 @@ global:
   imageRegistry:
   storageClass:
   ingressClassName:
+  extraVolumes: []
+  extraVolumeMounts: []
   annotations: {}
   labels: {}
 
@@ -74,7 +76,7 @@ pod:
         allowPrivilegeEscalation: false
         capabilities:
           drop:
-          - "ALL"
+            - "ALL"
       extraEnvs: []
       extraEnvFrom: []
       extraVolumeMounts: []

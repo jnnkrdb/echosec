@@ -7,7 +7,6 @@ on:
       - dev
     paths-ignore:
       - '.devcontainer/**'
-      - '.docs/**'
       - '.testing/**'
       - '.helm/**'
       - 'README.md'
