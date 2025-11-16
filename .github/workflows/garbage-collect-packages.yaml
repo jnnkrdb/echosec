@@ -6,7 +6,6 @@ on:
 
 jobs:
   garbage-collection:
-    needs: version
     runs-on: ubuntu-latest
     steps:
       - name: Remove Images

@@ -7,8 +7,7 @@ on:
       - dev
     paths-ignore:
       - '.devcontainer/**'
-      - '.testing/**'
-      - '.helm/**'
+      - '.charts/**'
       - 'README.md'
       - 'LICENSE'
       - 'VERSION'
