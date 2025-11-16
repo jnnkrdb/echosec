@@ -13,6 +13,7 @@ on:
       - master 
 
 env:
+  GITVERSION_FILE: .github/gitversion/GitVersion.yml
   HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
   HELM_DIR: .helm/
 
