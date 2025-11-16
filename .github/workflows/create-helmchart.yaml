@@ -15,7 +15,8 @@ on:
 env:
   GITVERSION_FILE: .github/gitversion/GitVersion.yml
   HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
-  HELM_DIR: .helm/
+  HELM_CHARTS_DIR: .charts
+  HELM_CHART: echosec
 
 jobs:
   version:
@@ -53,26 +54,26 @@ jobs:
           fetch-depth: 0
        
       - name: Update Dependencies
-        run: helm dependency update ${{ env.HELM_DIR }} --debug
+        run: helm dependency update ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} --debug
 
       - name: Lint
-        run: helm lint ${{ env.HELM_DIR }} --debug
+        run: helm lint ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} --debug
         
       - name: Validate
         uses: nlamirault/helm-kubeconform-action@v0.1.0
         with:
-          charts: ${{ env.HELM_DIR }}
+          charts: ${{ env.HELM_CHARTS_DIR }}
 
       #- name: Package
-      #  run:  helm package ${{ env.HELM_DIR }} --version ${{ needs.version.outputs.semver }}
+      #  run:  helm package ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} --version ${{ needs.version.outputs.semver }}
 
       - name: Chart | Push
         uses: appany/helm-oci-chart-releaser@v0.5.0
         with:
-          name: echosec
+          name: ${{ env.HELM_CHART }}
           repository: jnnkrdb
           tag: ${{ needs.version.outputs.semver }}
-          path: ${{ env.HELM_DIR }} # Default charts/{name}
+          path: ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} # Default charts/{name}
           registry: ghcr.io
           registry_username: ${{ github.actor }}
           registry_password: ${{ secrets.GHP_TOKEN }}

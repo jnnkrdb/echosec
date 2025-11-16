@@ -1,0 +1,18 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{- include "echosec.labels" . | nindent 4 }}
+    {{- include "common.labels" ( dict "labels" (list .Values.global.labels .Values.labels) ) | nindent 4 }}
+  annotations:
+    jnnkrdb.de/src: github.com/jnnkrdb/echosec
+    {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations .Values.annotations) ) | nindent 4 }}
+  name: {{ include "echosec.fullname" . }}-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "echosec.fullname" . }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: sa-{{ include "echosec.fullname" . }}
+    namespace: {{ .Release.Namespace }}
