@@ -56,7 +56,6 @@ Usage:
   {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations, .Values.annotations, .Values.pod.annotations) ) }}  
 */}}
 {{- define "common.annotations" }}
-{{- include "common.annotations.default" . }}
 {{- range .annotations }}
 {{- if . }}
 {{ . | toYaml }}
