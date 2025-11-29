@@ -1,0 +1,26 @@
+apiVersion: cluster.jnnkrdb.de/v1alpha1
+kind: ClusterObject
+metadata:
+  labels:
+    app.kubernetes.io/name: echosec
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterobject-sample-1
+namespaceRegexRules:
+  avoid:
+    - kube-*
+  match:
+    - '.*'
+resource:
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: test-role
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - namespaces
+      verbs:
+        - get
+        - list
+        - watch
