@@ -1,0 +1,19 @@
+apiVersion: cluster.jnnkrdb.de/v1alpha1
+kind: ClusterObject
+metadata:
+  labels:
+    app.kubernetes.io/name: echosec
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterobject-sample-0
+namespaceRegexRules:
+  avoid:
+    - kube-*
+  match:
+    - '.*'
+resource:
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: test-cm
+  data:
+    test-data: This is a test

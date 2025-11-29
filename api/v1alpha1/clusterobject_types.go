@@ -71,6 +71,7 @@ type ClusterObject struct {
 	RegexRules NamespaceRegexRules `json:"namespaceRegexRules"`
 
 	// +required
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Resource unstructured.Unstructured `json:"resource"`
 
 	// status defines the observed state of ClusterObject

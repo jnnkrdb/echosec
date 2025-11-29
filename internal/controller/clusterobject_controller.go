@@ -138,6 +138,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// update the values of the tempObject (only really needed for creating or updating)
 		sourceObject = createObject
+		sourceObject.SetNamespace(requestedObject.Namespace)
 
 		// set the owners reference
 		// this is required for watching the dependent objects
