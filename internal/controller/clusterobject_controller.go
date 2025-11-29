@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,13 +46,15 @@ import (
 // ClusterObjectReconciler reconciles a ClusterObject object
 type ClusterObjectReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clusterobjects,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clusterobjects/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clusterobjects/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -66,6 +69,8 @@ type ClusterObjectReconciler struct {
 func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var _log = log.FromContext(ctx)
 
+	ctx = context.WithValue(ctx, clusterv1alpha1.ReconcilerClient{}, r.Client)
+
 	// -------------------------------------------------------- meta handling
 	// receive the object, which should be reconciled
 	var recObj = &clusterv1alpha1.ClusterObject{}
@@ -77,30 +82,36 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// -------------------------------------------------------- item handling
+	if recObj.Status.ReconcileIndex == 0 {
+		r.Recorder.Eventf(recObj, "Normal", "InitialReconciliation", "Starting initial reconciliation")
+	}
 
-	var errorsList []error
+	// remove old errors from status (older than 15min)
+	recObj.RemoveOldErrors(ctx)
+
+	// -------------------------------------------------------- item handling
 
 	// handle the cluster secret
 	var namespaces = &corev1.NamespaceList{}
 	if err := r.List(ctx, namespaces, &client.ListOptions{}); err != nil {
 		_log.Error(err, "error fetching list of namespaces from cluster")
+		recObj.AddErrorToStatus(ctx, "", fmt.Errorf("error fetching list of namespaces from cluster: %v", err))
 		return ctrl.Result{}, err
 	}
 
+	var requiredNamespaces = []string{}
+	var forbiddenNamespaces = []string{}
+	var allNamespaces = func() []string {
+		return append(requiredNamespaces, forbiddenNamespaces...)
+	}
+
+	var errorsList []error
 	for _, namespace := range namespaces.Items {
 		var requestedObject = types.NamespacedName{Namespace: namespace.Name, Name: recObj.Resource.GetName()}
-		var sourceObject = recObj.Resource.DeepCopy()
-		var createObject = recObj.Resource.DeepCopy()
+		var destinationObject = recObj.Resource.DeepCopy()
 
-		nsLog := _log.V(3).WithValues("requested-object", requestedObject, "requested-object-kind", sourceObject.GetKind())
+		nsLog := _log.V(3).WithValues("requested-object", requestedObject, "requested-object-kind", destinationObject.GetKind())
 		nsLog.Info("check item in namespace")
-
-		// ignore namespace if marked for deletion
-		if !namespace.DeletionTimestamp.IsZero() {
-			nsLog.Info("namespace marked for deletion -> ignore")
-			continue
-		}
 
 		/*
 			following cases should be considered:
@@ -108,21 +119,28 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			2. secret should exist but does not -> create
 			3. secret should exist and it exists -> update
 			4. secret should not exist but does exist -> delete
-
 		*/
 
 		var shouldExist, doesExist bool
 		// should the item exist ?
 		if se, err := recObj.RegexRules.ShouldExistInNamespace(requestedObject.Namespace); err != nil {
 			nsLog.Error(err, "error calculating wether the item should exist or not")
+			recObj.AddErrorToStatus(ctx, requestedObject.Namespace, fmt.Errorf("error calculating wether the item should exist or not: %v", err))
 			errorsList = append(errorsList, err)
 			continue
 		} else {
 			shouldExist = se
 		}
 
+		// add the namespace either to the required namespaces or forbidden namespaces
+		if shouldExist {
+			requiredNamespaces = append(requiredNamespaces, requestedObject.Namespace)
+		} else {
+			forbiddenNamespaces = append(forbiddenNamespaces, requestedObject.Namespace)
+		}
+
 		// does the item exist ?
-		if err := r.Get(ctx, requestedObject, sourceObject, &client.GetOptions{}); err != nil {
+		if err := r.Get(ctx, requestedObject, destinationObject, &client.GetOptions{}); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				nsLog.Error(err, "error fetching object from cluster")
 				errorsList = append(errorsList, err)
@@ -137,12 +155,12 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		nsLog = nsLog.WithValues("shouldExist", shouldExist, "doesExist", doesExist)
 
 		// update the values of the tempObject (only really needed for creating or updating)
-		sourceObject = createObject
-		sourceObject.SetNamespace(requestedObject.Namespace)
+		destinationObject = recObj.Resource.DeepCopy()
+		destinationObject.SetNamespace(requestedObject.Namespace)
 
 		// set the owners reference
 		// this is required for watching the dependent objects
-		if err := controllerutil.SetControllerReference(recObj, sourceObject, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(recObj, destinationObject, r.Scheme); err != nil {
 			nsLog.Error(err, "unable to set owners reference, stopping reconciliation")
 			return ctrl.Result{}, err
 		}
@@ -155,7 +173,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
 			nsLog.Info("the requested object does not exist but should exist -> creating")
-			if err := r.Create(ctx, sourceObject, &client.CreateOptions{}); err != nil {
+			if err := r.Create(ctx, destinationObject, &client.CreateOptions{}); err != nil {
 				nsLog.Error(err, "error creating object")
 				errorsList = append(errorsList, err)
 				continue
@@ -163,7 +181,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
 			nsLog.Info("the requested object does exist and should exist -> updating")
-			if err := r.Update(ctx, sourceObject, &client.UpdateOptions{}); err != nil {
+			if err := r.Update(ctx, destinationObject, &client.UpdateOptions{}); err != nil {
 				nsLog.Error(err, "error updating object")
 				errorsList = append(errorsList, err)
 				continue
@@ -171,7 +189,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
 			nsLog.Info("the requested object does exist but should not exist -> deleting")
-			if err := r.Delete(ctx, sourceObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+			if err := r.Delete(ctx, destinationObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 				nsLog.Error(err, "error deleting object from cluster")
 				errorsList = append(errorsList, err)
 				continue
@@ -181,6 +199,11 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// -------------------------------------------------------- finish
 
+	r.Recorder.Eventf(recObj, "Normal", "ReconciledObject",
+		"Reconciled object for namespaces [%v], required namespaces [%v], forbidden namespaces [%v]",
+		allNamespaces, requiredNamespaces, forbiddenNamespaces,
+	)
+
 	if len(errorsList) > 0 {
 		e := fmt.Errorf("errorsList not empty")
 		_log.Error(e, "clusterobject handled, but with errors", "errors", errorsList)
@@ -188,6 +211,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	_log.Info("clusterobject handled without errors ")
+
 	return ctrl.Result{}, nil
 }
 

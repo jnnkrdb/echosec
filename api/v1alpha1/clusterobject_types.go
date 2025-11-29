@@ -25,8 +25,15 @@ SOFTWARE.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jnnkrdb/echosec/internal/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -53,6 +60,19 @@ type ClusterObjectStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	LatestErrors []ReconcileError `json:"latestErrors"`
+
+	// +default:numerical=0
+	ReconcileIndex int `json:"reconcileIndex"`
+}
+
+// this is a status object, which is used to list the errors made during the last 10 runs
+type ReconcileError struct {
+	DateTime time.Time `json:"dateTime"`
+	//+optional
+	Namespace string `json:"namespace,omitempty"`
+	Error     string `json:"error"`
 }
 
 // +kubebuilder:object:root=true
@@ -90,4 +110,50 @@ type ClusterObjectList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterObject{}, &ClusterObjectList{})
+}
+
+// -------------------------------------------------------- declaring funcs
+
+type ReconcilerClient struct{}
+
+// remove errors, older than a constant amount of time (15min)
+func (co *ClusterObject) RemoveOldErrors(ctx context.Context) {
+
+	const timeDuration time.Duration = time.Duration(15 * time.Minute)
+
+	var _log = log.FromContext(ctx)
+	c, ok := ctx.Value(ReconcilerClient{}).(client.Client)
+	if !ok {
+		_log.Error(fmt.Errorf("couldn't get reconciler from context"), "receive client error", `ctx.Value(ReconcilerClient{})`, ctx.Value(ReconcilerClient{}))
+		return
+	}
+
+	for i, e := range co.Status.LatestErrors {
+		if timeDuration < time.Since(co.Status.LatestErrors[i].DateTime) {
+			co.Status.LatestErrors = pkg.RemoveFromSlice(co.Status.LatestErrors, e)
+		}
+	}
+	if err := c.Status().Update(ctx, co, &client.SubResourceUpdateOptions{}); err != nil {
+		_log.Error(err, "unable to remove old errors from status subresource")
+	}
+}
+
+// add an error to the status subresource of the object
+func (co *ClusterObject) AddErrorToStatus(ctx context.Context, namespace string, err error) {
+	var _log = log.FromContext(ctx)
+	c, ok := ctx.Value(ReconcilerClient{}).(client.Client)
+	if !ok {
+		_log.Error(fmt.Errorf("couldn't get reconciler from context"), "receive client error", `ctx.Value(ReconcilerClient{})`, ctx.Value(ReconcilerClient{}))
+		return
+	}
+
+	co.Status.LatestErrors = append(co.Status.LatestErrors, ReconcileError{
+		Namespace: namespace,
+		DateTime:  time.Now(),
+		Error:     err.Error(),
+	})
+
+	if err := c.Status().Update(ctx, co, &client.SubResourceUpdateOptions{}); err != nil {
+		_log.Error(err, "unable to apply error message to status subresource")
+	}
 }
