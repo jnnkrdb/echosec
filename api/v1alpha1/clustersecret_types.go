@@ -31,33 +31,6 @@ type ClusterSecretSpec struct {
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
-	// this field will be used for the name of the secret, if there is non, then
-	// the name of the cluster-secret will be used
-	// +optional
-	SecretName *string `json:"secretName,omitempty"`
-
-	// +optional
-	RegexRules NamespaceRegexRules `json:"namespaceRegexRules"`
-
-	// Used to facilitate programmatic handling of secret data.
-	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
-	// +optional
-	Type corev1.SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
-
-	// Data contains the secret data. Each key must consist of alphanumeric
-	// characters, '-', '_' or '.'. The serialized form of the secret data is a
-	// base64 encoded string, representing the arbitrary (possibly non-string)
-	// data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
-	// +optional
-	Data map[string][]byte `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
-
-	// stringData allows specifying non-binary secret data in string form.
-	// It is provided as a write-only input field for convenience.
-	// All keys and values are merged into the data field on write, overwriting any existing values.
-	// The stringData field is never output when reading from the API.
-	// +k8s:conversion-gen=false
-	// +optional
-	StringData map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 }
 
 // ClusterSecretStatus defines the observed state of ClusterSecret.
@@ -95,9 +68,28 @@ type ClusterSecret struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty,omitzero"`
 
-	// spec defines the desired state of ClusterSecret
-	// +required
-	Spec ClusterSecretSpec `json:"spec"`
+	// +optional
+	RegexRules NamespaceRegexRules `json:"namespaceRegexRules"`
+
+	// Used to facilitate programmatic handling of secret data.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+	// +optional
+	Type corev1.SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
+
+	// Data contains the secret data. Each key must consist of alphanumeric
+	// characters, '-', '_' or '.'. The serialized form of the secret data is a
+	// base64 encoded string, representing the arbitrary (possibly non-string)
+	// data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
+	// +optional
+	Data map[string][]byte `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
+
+	// stringData allows specifying non-binary secret data in string form.
+	// It is provided as a write-only input field for convenience.
+	// All keys and values are merged into the data field on write, overwriting any existing values.
+	// The stringData field is never output when reading from the API.
+	// +k8s:conversion-gen=false
+	// +optional
+	StringData map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 
 	// status defines the observed state of ClusterSecret
 	// +optional

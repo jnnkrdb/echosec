@@ -24,12 +24,14 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ec
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
-ARG VERSION_ARG="latest"
 LABEL org.opencontainers.image.source=https://github.com/jnnkrdb/echosec
+
+# set envs from args
+ARG VERSION="latest"
+ENV VERSION=${VERSION}
 
 WORKDIR /
 COPY --from=builder /workspace/echosec .
-ENV VERSION=${VERSION_ARG}
 USER 65532:65532
 
 ENTRYPOINT ["/echosec"]

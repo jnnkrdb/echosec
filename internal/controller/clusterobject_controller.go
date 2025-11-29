@@ -1,17 +1,25 @@
 /*
-Copyright 2025.
+MIT License
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+Copyright (c) 2017
 
-    http://www.apache.org/licenses/LICENSE-2.0
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 package controller
@@ -20,6 +28,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,37 +40,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 )
 
-// ClusterSecretReconciler reconciles a ClusterSecret object
-type ClusterSecretReconciler struct {
+// ClusterObjectReconciler reconciles a ClusterObject object
+type ClusterObjectReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clustersecrets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clusterobjects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clusterobjects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=cluster.jnnkrdb.de,resources=clusterobjects/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the ClusterSecret object against the actual cluster state, and then
+// the ClusterObject object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
-func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var _log = log.FromContext(ctx)
 
 	// -------------------------------------------------------- meta handling
 	// receive the object, which should be reconciled
-	var recObj = &clusterv1alpha1.ClusterSecret{}
+	var recObj = &clusterv1alpha1.ClusterObject{}
 	if err := r.Get(ctx, req.NamespacedName, recObj, &client.GetOptions{}); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
@@ -82,10 +89,11 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	for _, namespace := range namespaces.Items {
-		var requestedSecret = types.NamespacedName{Namespace: namespace.Name, Name: recObj.Name}
-		var tempSecret = &corev1.Secret{}
+		var requestedObject = types.NamespacedName{Namespace: namespace.Name, Name: recObj.Resource.GetName()}
+		var sourceObject = recObj.Resource.DeepCopy()
+		var createObject = recObj.Resource.DeepCopy()
 
-		nsLog := _log.V(3).WithValues("requested-secret", requestedSecret)
+		nsLog := _log.V(3).WithValues("requested-object", requestedObject, "requested-object-kind", sourceObject.GetKind())
 		nsLog.Info("check item in namespace")
 
 		// ignore namespace if marked for deletion
@@ -105,7 +113,7 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		var shouldExist, doesExist bool
 		// should the item exist ?
-		if se, err := recObj.RegexRules.ShouldExistInNamespace(requestedSecret.Namespace); err != nil {
+		if se, err := recObj.RegexRules.ShouldExistInNamespace(requestedObject.Namespace); err != nil {
 			nsLog.Error(err, "error calculating wether the item should exist or not")
 			errorsList = append(errorsList, err)
 			continue
@@ -114,7 +122,7 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		// does the item exist ?
-		if err := r.Get(ctx, requestedSecret, tempSecret, &client.GetOptions{}); err != nil {
+		if err := r.Get(ctx, requestedObject, sourceObject, &client.GetOptions{}); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				nsLog.Error(err, "error fetching object from cluster")
 				errorsList = append(errorsList, err)
@@ -128,16 +136,12 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// update log with new values
 		nsLog = nsLog.WithValues("shouldExist", shouldExist, "doesExist", doesExist)
 
-		// update the values of the tempSecret (only really needed for creating or updating)
-		tempSecret.Name = requestedSecret.Name
-		tempSecret.Namespace = requestedSecret.Namespace
-		tempSecret.Data = recObj.Data
-		tempSecret.StringData = recObj.StringData
-		tempSecret.Type = recObj.Type
+		// update the values of the tempObject (only really needed for creating or updating)
+		sourceObject = createObject
 
 		// set the owners reference
 		// this is required for watching the dependent objects
-		if err := controllerutil.SetControllerReference(recObj, tempSecret, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(recObj, sourceObject, r.Scheme); err != nil {
 			nsLog.Error(err, "unable to set owners reference, stopping reconciliation")
 			return ctrl.Result{}, err
 		}
@@ -145,28 +149,28 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// after calculating the current state, handle the 4 cases
 		switch {
 		case !shouldExist && !doesExist: // --------------------------------------------------------- case 1 -> ignore
-			nsLog.Info("the requested secret does not exist and should not exist -> ignoring")
+			nsLog.Info("the requested object does not exist and should not exist -> ignoring")
 			continue
 
 		case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
-			nsLog.Info("the requested secret does not exist but should exist -> creating")
-			if err := r.Create(ctx, tempSecret, &client.CreateOptions{}); err != nil {
+			nsLog.Info("the requested object does not exist but should exist -> creating")
+			if err := r.Create(ctx, sourceObject, &client.CreateOptions{}); err != nil {
 				nsLog.Error(err, "error creating object")
 				errorsList = append(errorsList, err)
 				continue
 			}
 
 		case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
-			nsLog.Info("the requested secret does exist and should exist -> updating")
-			if err := r.Update(ctx, tempSecret, &client.UpdateOptions{}); err != nil {
+			nsLog.Info("the requested object does exist and should exist -> updating")
+			if err := r.Update(ctx, sourceObject, &client.UpdateOptions{}); err != nil {
 				nsLog.Error(err, "error updating object")
 				errorsList = append(errorsList, err)
 				continue
 			}
 
 		case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
-			nsLog.Info("the requested secret does exist but should not exist -> deleting")
-			if err := r.Delete(ctx, tempSecret, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+			nsLog.Info("the requested object does exist but should not exist -> deleting")
+			if err := r.Delete(ctx, sourceObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 				nsLog.Error(err, "error deleting object from cluster")
 				errorsList = append(errorsList, err)
 				continue
@@ -178,39 +182,38 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if len(errorsList) > 0 {
 		e := fmt.Errorf("errorsList not empty")
-		_log.Error(e, "clustersecret handled, but with errors", "errors", errorsList)
+		_log.Error(e, "clusterobject handled, but with errors", "errors", errorsList)
 		return ctrl.Result{}, e
 	}
 
-	_log.Info("clustersecret handled without errors ")
+	_log.Info("clusterobject handled without errors ")
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ClusterSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ClusterObjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&clusterv1alpha1.ClusterSecret{}).
-		Named("clustersecret").
+		For(&clusterv1alpha1.ClusterObject{}).
+		Named("clusterobject").
 		WithEventFilter(
 			predicate.Or(
 				predicate.GenerationChangedPredicate{},
 				predicate.ResourceVersionChangedPredicate{},
 			),
 		).
-		Owns(&corev1.Secret{}).
 		Watches(
 			&corev1.Namespace{},
 			handler.EnqueueRequestsFromMapFunc(
 				func(ctx context.Context, obj client.Object) (requests []reconcile.Request) {
 					var _log = log.FromContext(ctx)
-					// trigger reconciliation for all clustersecrets
-					var list = &clusterv1alpha1.ClusterSecretList{}
+					// trigger reconciliation for all clusterobjects
+					var list = &clusterv1alpha1.ClusterObjectList{}
 					if err := mgr.GetClient().List(ctx, list, &client.ListOptions{}); err != nil {
-						_log.Error(err, "error receiving list of clustersecrets, cannot invoke reconciliation")
+						_log.Error(err, "error receiving list of clusterobjects, cannot invoke reconciliation")
 						return
 					}
-					for _, cs := range list.Items {
-						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Name: cs.Name}})
+					for _, co := range list.Items {
+						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Name: co.Name}})
 					}
 					return
 				},
