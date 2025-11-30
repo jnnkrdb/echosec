@@ -27,9 +27,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/jnnkrdb/echosec/internal/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,19 +58,6 @@ type ClusterObjectStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	LatestErrors []ReconcileError `json:"latestErrors"`
-
-	// +default:numerical=0
-	ReconcileIndex int `json:"reconcileIndex"`
-}
-
-// this is a status object, which is used to list the errors made during the last 10 runs
-type ReconcileError struct {
-	DateTime time.Time `json:"dateTime"`
-	//+optional
-	Namespace string `json:"namespace,omitempty"`
-	Error     string `json:"error"`
 }
 
 // +kubebuilder:object:root=true
@@ -112,48 +97,74 @@ func init() {
 	SchemeBuilder.Register(&ClusterObject{}, &ClusterObjectList{})
 }
 
-// -------------------------------------------------------- declaring funcs
+// -------------------------------------------------------- conditions
+const (
+	Condition_Ready = "Ready"
+)
 
-type ReconcilerClient struct{}
+func (co *ClusterObject) FindCondition(ctx context.Context, conditionType string) *metav1.Condition {
 
-// remove errors, older than a constant amount of time (15min)
-func (co *ClusterObject) RemoveOldErrors(ctx context.Context) {
+	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
 
-	const timeDuration time.Duration = time.Duration(15 * time.Minute)
+	_log.V(5).Info("requested condition")
 
-	var _log = log.FromContext(ctx)
-	c, ok := ctx.Value(ReconcilerClient{}).(client.Client)
-	if !ok {
-		_log.Error(fmt.Errorf("couldn't get reconciler from context"), "receive client error", `ctx.Value(ReconcilerClient{})`, ctx.Value(ReconcilerClient{}))
-		return
-	}
+	for i := range co.Status.Conditions {
 
-	for i, e := range co.Status.LatestErrors {
-		if timeDuration < time.Since(co.Status.LatestErrors[i].DateTime) {
-			co.Status.LatestErrors = pkg.RemoveFromSlice(co.Status.LatestErrors, e)
+		if co.Status.Conditions[i].Type == conditionType {
+
+			_log.V(5).Info("condition found", "conditon", co.Status.Conditions[i])
+
+			return &co.Status.Conditions[i]
 		}
 	}
-	if err := c.Status().Update(ctx, co, &client.SubResourceUpdateOptions{}); err != nil {
-		_log.Error(err, "unable to remove old errors from status subresource")
-	}
+
+	_log.V(5).Info("condition not found")
+
+	return nil
 }
 
-// add an error to the status subresource of the object
-func (co *ClusterObject) AddErrorToStatus(ctx context.Context, namespace string, err error) {
+func (co *ClusterObject) SetCondition(ctx context.Context, c client.Client,
+	t string, s metav1.ConditionStatus, r string, mf string, a ...any) error {
+
 	var _log = log.FromContext(ctx)
-	c, ok := ctx.Value(ReconcilerClient{}).(client.Client)
-	if !ok {
-		_log.Error(fmt.Errorf("couldn't get reconciler from context"), "receive client error", `ctx.Value(ReconcilerClient{})`, ctx.Value(ReconcilerClient{}))
-		return
+
+	var _condition *metav1.Condition = co.FindCondition(ctx, t)
+
+	// if there is no condition with the specified type, then create a new condition and
+	// add it to the list of conditions
+	if _condition == nil {
+
+		c := metav1.Condition{
+			Type:               t,
+			Status:             s,
+			ObservedGeneration: co.GetGeneration(),
+			LastTransitionTime: metav1.Now(),
+			Reason:             r,
+			Message:            fmt.Sprintf(mf, a...),
+		}
+
+		_log.V(5).Info("adding condition", "condition", c)
+
+		co.Status.Conditions = append(co.Status.Conditions, c)
+
+	} else {
+
+		// cnage values of the given condition
+		_condition.LastTransitionTime = func() metav1.Time {
+			if _condition.Status != s {
+
+				return metav1.Now()
+			}
+			return _condition.LastTransitionTime
+		}()
+		_condition.Status = s
+		_condition.ObservedGeneration = co.GetGeneration()
+		_condition.Reason = r
+		_condition.Message = fmt.Sprintf(mf, a...)
+
+		_log.V(5).Info("updated condition", "condition", *_condition)
+
 	}
 
-	co.Status.LatestErrors = append(co.Status.LatestErrors, ReconcileError{
-		Namespace: namespace,
-		DateTime:  time.Now(),
-		Error:     err.Error(),
-	})
-
-	if err := c.Status().Update(ctx, co, &client.SubResourceUpdateOptions{}); err != nil {
-		_log.Error(err, "unable to apply error message to status subresource")
-	}
+	return c.Status().Update(ctx, co, &client.SubResourceUpdateOptions{})
 }

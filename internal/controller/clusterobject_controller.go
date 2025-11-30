@@ -26,9 +26,9 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -69,12 +69,10 @@ type ClusterObjectReconciler struct {
 func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var _log = log.FromContext(ctx)
 
-	ctx = context.WithValue(ctx, clusterv1alpha1.ReconcilerClient{}, r.Client)
-
 	// -------------------------------------------------------- meta handling
 	// receive the object, which should be reconciled
-	var recObj = &clusterv1alpha1.ClusterObject{}
-	if err := r.Get(ctx, req.NamespacedName, recObj, &client.GetOptions{}); err != nil {
+	var co = &clusterv1alpha1.ClusterObject{}
+	if err := r.Get(ctx, req.NamespacedName, co, &client.GetOptions{}); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
 			_log.Error(err, "error fetching object from cluster")
@@ -82,137 +80,44 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	if recObj.Status.ReconcileIndex == 0 {
-		r.Recorder.Eventf(recObj, "Normal", "InitialReconciliation", "Starting initial reconciliation")
-	}
-
-	// remove old errors from status (older than 15min)
-	recObj.RemoveOldErrors(ctx)
-
-	// -------------------------------------------------------- item handling
-
-	// handle the cluster secret
+	// request a list of namespaces, to parse through the list and
+	// then check every namespace with the give item
 	var namespaces = &corev1.NamespaceList{}
 	if err := r.List(ctx, namespaces, &client.ListOptions{}); err != nil {
+
 		_log.Error(err, "error fetching list of namespaces from cluster")
-		recObj.AddErrorToStatus(ctx, "", fmt.Errorf("error fetching list of namespaces from cluster: %v", err))
+
+		r.Recorder.Eventf(co, "Warning", "ListNamespacesError", "error listing namespaces: %v", err)
+
+		if e := co.SetCondition(
+			ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedToListNamespaces", "error listing namespaces: %v", err,
+		); e != nil {
+			return ctrl.Result{}, e
+		}
+
 		return ctrl.Result{}, err
 	}
 
-	var requiredNamespaces = []string{}
-	var forbiddenNamespaces = []string{}
-	var allNamespaces = func() []string {
-		return append(requiredNamespaces, forbiddenNamespaces...)
-	}
-
-	var errorsList []error
 	for _, namespace := range namespaces.Items {
-		var requestedObject = types.NamespacedName{Namespace: namespace.Name, Name: recObj.Resource.GetName()}
-		var destinationObject = recObj.Resource.DeepCopy()
 
-		nsLog := _log.V(3).WithValues("requested-object", requestedObject, "requested-object-kind", destinationObject.GetKind())
-		nsLog.Info("check item in namespace")
-
-		/*
-			following cases should be considered:
-			1. secret should not exist and does not exist -> ignore
-			2. secret should exist but does not -> create
-			3. secret should exist and it exists -> update
-			4. secret should not exist but does exist -> delete
-		*/
-
-		var shouldExist, doesExist bool
-		// should the item exist ?
-		if se, err := recObj.RegexRules.ShouldExistInNamespace(requestedObject.Namespace); err != nil {
-			nsLog.Error(err, "error calculating wether the item should exist or not")
-			recObj.AddErrorToStatus(ctx, requestedObject.Namespace, fmt.Errorf("error calculating wether the item should exist or not: %v", err))
-			errorsList = append(errorsList, err)
-			continue
-		} else {
-			shouldExist = se
-		}
-
-		// add the namespace either to the required namespaces or forbidden namespaces
-		if shouldExist {
-			requiredNamespaces = append(requiredNamespaces, requestedObject.Namespace)
-		} else {
-			forbiddenNamespaces = append(forbiddenNamespaces, requestedObject.Namespace)
-		}
-
-		// does the item exist ?
-		if err := r.Get(ctx, requestedObject, destinationObject, &client.GetOptions{}); err != nil {
-			if client.IgnoreNotFound(err) != nil {
-				nsLog.Error(err, "error fetching object from cluster")
-				errorsList = append(errorsList, err)
-				continue
-			}
-			doesExist = false
-		} else {
-			doesExist = true
-		}
-
-		// update log with new values
-		nsLog = nsLog.WithValues("shouldExist", shouldExist, "doesExist", doesExist)
-
-		// update the values of the tempObject (only really needed for creating or updating)
-		destinationObject = recObj.Resource.DeepCopy()
-		destinationObject.SetNamespace(requestedObject.Namespace)
-
-		// set the owners reference
-		// this is required for watching the dependent objects
-		if err := controllerutil.SetControllerReference(recObj, destinationObject, r.Scheme); err != nil {
-			nsLog.Error(err, "unable to set owners reference, stopping reconciliation")
+		// reconcile the object for a specific namespace, if an error occurs, then throw reconcile error
+		if err := r.ReconcileObjectForNamespace(ctx, co, namespace); err != nil {
 			return ctrl.Result{}, err
 		}
-
-		// after calculating the current state, handle the 4 cases
-		switch {
-		case !shouldExist && !doesExist: // --------------------------------------------------------- case 1 -> ignore
-			nsLog.Info("the requested object does not exist and should not exist -> ignoring")
-			continue
-
-		case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
-			nsLog.Info("the requested object does not exist but should exist -> creating")
-			if err := r.Create(ctx, destinationObject, &client.CreateOptions{}); err != nil {
-				nsLog.Error(err, "error creating object")
-				errorsList = append(errorsList, err)
-				continue
-			}
-
-		case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
-			nsLog.Info("the requested object does exist and should exist -> updating")
-			if err := r.Update(ctx, destinationObject, &client.UpdateOptions{}); err != nil {
-				nsLog.Error(err, "error updating object")
-				errorsList = append(errorsList, err)
-				continue
-			}
-
-		case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
-			nsLog.Info("the requested object does exist but should not exist -> deleting")
-			if err := r.Delete(ctx, destinationObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-				nsLog.Error(err, "error deleting object from cluster")
-				errorsList = append(errorsList, err)
-				continue
-			}
-		}
 	}
 
-	// -------------------------------------------------------- finish
+	_log.Info("reconciled")
 
-	r.Recorder.Eventf(recObj, "Normal", "ReconciledObject",
-		"Reconciled object for namespaces [%v], required namespaces [%v], forbidden namespaces [%v]",
-		allNamespaces, requiredNamespaces, forbiddenNamespaces,
+	r.Recorder.Eventf(co, "Normal", "ReconciledObject", "successfully cloned resource in required namespaces")
+
+	return ctrl.Result{}, co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready,
+		metav1.ConditionTrue, "DeployedResource",
+		"successfully deployed resource [%s/%s:%s]",
+		co.Resource.GetAPIVersion(),
+		co.Resource.GetKind(),
+		co.Resource.GetName(),
 	)
-
-	if len(errorsList) > 0 {
-		e := fmt.Errorf("errorsList not empty")
-		_log.Error(e, "clusterobject handled, but with errors", "errors", errorsList)
-		return ctrl.Result{}, e
-	}
-
-	_log.Info("clusterobject handled without errors ")
-
-	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -245,4 +150,148 @@ func (r *ClusterObjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			),
 		).
 		Complete(r)
+}
+
+// ------------------------------------------------------ status functions
+
+/*
+this function checks the requested resource, wether it should exist in a namespace, or not.
+
+following cases should be considered:
+ 1. secret should not exist and does not exist -> ignore
+ 2. secret should exist but does not -> create
+ 3. secret should exist and it exists -> update
+ 4. secret should not exist but does exist -> delete
+*/
+func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+	var _log = log.FromContext(ctx).WithValues(
+		"apiVersion", co.Resource.GetAPIVersion(),
+		"kind", co.Resource.GetKind(),
+		"name", co.Resource.GetName(),
+		"namespace", namespace.GetName(),
+	)
+
+	_log.V(3).Info("check object")
+
+	//var requestedObject = types.NamespacedName{Namespace: namespace.Name, Name: co.Resource.GetName()}
+	var typedObject = co.Resource.DeepCopy()
+	var shouldExist, doesExist bool
+
+	// check, if the object should exist in the namespace
+	if se, err := co.RegexRules.ShouldExistInNamespace(namespace.Name); err != nil {
+
+		_log.Error(err, "error calculating wether the item should exist or not")
+
+		r.Recorder.Eventf(co, "Warning", "CalculatingNamespaceError",
+			"error calculating wether the item should exist or not: %v", err)
+
+		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedToCalculateNamespace", "error calculating wether the item should exist or not: %v", err); e != nil {
+			return e
+		}
+
+		return err
+
+	} else {
+
+		shouldExist = se
+	}
+
+	// check, if the requested object does exist in the namespace
+	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: co.Resource.GetName()},
+		typedObject, &client.GetOptions{}); err != nil {
+
+		if client.IgnoreNotFound(err) != nil {
+
+			_log.Error(err, "error receiving the object from the cluster")
+
+			r.Recorder.Eventf(co, "Warning", "ReceivingClusterObjectError",
+				"error receiving the object from the cluster: %v", err)
+
+			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+				"FailedToReceiveObjectFromCluster", "error receiving the object from the cluster: %v", err); e != nil {
+				return e
+			}
+
+			return err
+		}
+
+		doesExist = false
+
+	} else {
+
+		doesExist = true
+	}
+
+	_log.V(3).Info("state calculated", "shouldExist", shouldExist, "doesExist", doesExist)
+
+	// update the values of the tempObject (only really needed for creating or updating)
+	typedObject = co.Resource.DeepCopy()
+	typedObject.SetNamespace(namespace.Name)
+
+	// set the owners reference
+	// this is required for watching the dependent objects
+	if err := controllerutil.SetControllerReference(co, typedObject, r.Scheme); err != nil {
+
+		_log.Error(err, "unable to set owners reference")
+
+		r.Recorder.Eventf(co, "Warning", "SettingOwnerReferenceError",
+			"unable to set owners reference: %v", err)
+
+		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedToSetOwnerReference", "unable to set owners reference: %v", err); e != nil {
+			return e
+		}
+		return err
+	}
+
+	// after calculating the current state, handle the 4 cases
+	switch {
+	case !shouldExist && !doesExist: // --------------------------------------------------------- case 1 -> ignore
+		_log.V(3).Info("ignoring")
+
+	case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
+		_log.V(3).Info("creating")
+		if err := r.Create(ctx, typedObject, &client.CreateOptions{}); err != nil {
+			_log.Error(err, "error creating object")
+
+			r.Recorder.Eventf(co, "Warning", "CreatingObjectError", "error creating object: %v", err)
+
+			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+				"FailedCreatingObject", "error creating object: %v", err); e != nil {
+				return e
+			}
+			return err
+		}
+
+	case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
+		_log.V(3).Info("updating")
+		if err := r.Update(ctx, typedObject, &client.UpdateOptions{}); err != nil {
+			_log.Error(err, "error updating object")
+
+			r.Recorder.Eventf(co, "Warning", "UpdatingObjectError", "error updating object: %v", err)
+
+			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+				"FailedUpdatingObject", "error updating object: %v", err); e != nil {
+				return e
+			}
+			return err
+		}
+
+	case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
+		_log.V(3).Info("deleting")
+		if err := r.Delete(ctx, typedObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+			_log.Error(err, "error deleting object")
+
+			r.Recorder.Eventf(co, "Warning", "DeletingObjectError", "error deleting object: %v", err)
+
+			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+				"FailedDeletingObject", "error deleting object: %v", err); e != nil {
+				return e
+			}
+			return err
+		}
+	}
+
+	return nil
 }
