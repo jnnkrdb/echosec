@@ -43,6 +43,12 @@ var _ = Describe("ClusterObject Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
+		var testResource = unstructured.Unstructured{}
+		testResource.SetAPIVersion("v1")
+		testResource.SetKind("Secret")
+		testResource.SetName("test-secret")
+		testResource.SetNamespace("test-namespace")
+
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
@@ -60,7 +66,7 @@ var _ = Describe("ClusterObject Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					Resource: unstructured.Unstructured{},
+					Resource: testResource,
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

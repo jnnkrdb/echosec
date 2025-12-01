@@ -12,26 +12,6 @@ rules:
   - create
   - patch
 - apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - '*'
   resources:
   - '*'
@@ -47,7 +27,6 @@ rules:
   - cluster.jnnkrdb.de
   resources:
   - clusterobjects
-  - clustersecrets
   verbs:
   - create
   - delete
@@ -60,14 +39,12 @@ rules:
   - cluster.jnnkrdb.de
   resources:
   - clusterobjects/finalizers
-  - clustersecrets/finalizers
   verbs:
   - update
 - apiGroups:
   - cluster.jnnkrdb.de
   resources:
   - clusterobjects/status
-  - clustersecrets/status
   verbs:
   - get
   - patch

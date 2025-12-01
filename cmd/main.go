@@ -187,13 +187,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.ClusterSecretReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ClusterSecret")
-		os.Exit(1)
-	}
 	if err := (&controller.ClusterObjectReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
