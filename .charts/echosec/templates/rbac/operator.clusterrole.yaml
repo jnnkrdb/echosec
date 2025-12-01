@@ -9,15 +9,48 @@ metadata:
     {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations .Values.annotations) ) | nindent 4 }}
   name: {{ include "echosec.fullname" . }}-controller
 rules: 
-  - apiGroups:
-      - "*"
-    resources:
-      - "*"
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.jnnkrdb.de
+  resources:
+  - clusterobjects
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.jnnkrdb.de
+  resources:
+  - clusterobjects/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cluster.jnnkrdb.de
+  resources:
+  - clusterobjects/status
+  verbs:
+  - get
+  - patch
+  - update
