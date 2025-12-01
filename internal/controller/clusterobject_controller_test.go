@@ -42,6 +42,7 @@ import (
 var _ = Describe("ClusterObject Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
+		const resourceNamespace = "test-namespace"
 
 		var testResource = unstructured.Unstructured{}
 		testResource.SetAPIVersion("v1")
@@ -53,7 +54,7 @@ var _ = Describe("ClusterObject Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: resourceNamespace, // TODO(user):Modify as needed
 		}
 		clusterobject := &clusterv1alpha1.ClusterObject{}
 
@@ -64,7 +65,7 @@ var _ = Describe("ClusterObject Controller", func() {
 				resource := &clusterv1alpha1.ClusterObject{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
-						Namespace: "default",
+						Namespace: resourceNamespace,
 					},
 					Resource: testResource,
 				}
