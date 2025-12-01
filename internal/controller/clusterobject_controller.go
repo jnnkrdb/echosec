@@ -173,7 +173,6 @@ func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Contex
 
 	_log.V(3).Info("check object")
 
-	//var requestedObject = types.NamespacedName{Namespace: namespace.Name, Name: co.Resource.GetName()}
 	var typedObject = co.Resource.DeepCopy()
 	var shouldExist, doesExist bool
 

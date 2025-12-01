@@ -112,7 +112,7 @@ func (co *ClusterObject) FindCondition(ctx context.Context, conditionType string
 
 		if co.Status.Conditions[i].Type == conditionType {
 
-			_log.V(5).Info("condition found", "conditon", co.Status.Conditions[i])
+			_log.V(5).Info("condition found", "condition", co.Status.Conditions[i])
 
 			return &co.Status.Conditions[i]
 		}
@@ -128,7 +128,7 @@ func (co *ClusterObject) SetCondition(ctx context.Context, c client.Client,
 
 	var _log = log.FromContext(ctx)
 
-	var _condition *metav1.Condition = co.FindCondition(ctx, t)
+	var _condition = co.FindCondition(ctx, t)
 
 	// if there is no condition with the specified type, then create a new condition and
 	// add it to the list of conditions
