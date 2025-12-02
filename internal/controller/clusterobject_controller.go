@@ -29,6 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -39,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"slices"
 
 	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
 )
@@ -102,7 +105,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	for _, namespace := range namespaces.Items {
 
 		// reconcile the object for a specific namespace, if an error occurs, then throw reconcile error
-		if err := r.ReconcileObjectForNamespace(ctx, co, namespace); err != nil {
+		if err := r.reconcileObjectForNamespace(ctx, co, namespace); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -163,7 +166,8 @@ following cases should be considered:
  3. secret should exist and it exists -> update
  4. secret should not exist but does exist -> delete
 */
-func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+func (r *ClusterObjectReconciler) reconcileObjectForNamespace(ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", co.Resource.GetAPIVersion(),
 		"kind", co.Resource.GetKind(),
@@ -173,7 +177,6 @@ func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Contex
 
 	_log.V(3).Info("check object")
 
-	var typedObject = co.Resource.DeepCopy()
 	var shouldExist, doesExist bool
 
 	// check, if the object should exist in the namespace
@@ -196,6 +199,7 @@ func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Contex
 		shouldExist = se
 	}
 
+	var typedObject = co.Resource.DeepCopy()
 	// check, if the requested object does exist in the namespace
 	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: co.Resource.GetName()},
 		typedObject, &client.GetOptions{}); err != nil {
@@ -224,8 +228,40 @@ func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Contex
 
 	_log.V(3).Info("state calculated", "shouldExist", shouldExist, "doesExist", doesExist)
 
-	// update the values of the tempObject (only really needed for creating or updating)
-	typedObject = co.Resource.DeepCopy()
+	// after calculating the current state, handle the 4 cases
+	switch {
+	case !shouldExist && !doesExist: // --------------------------------------------------------- case 1 -> ignore
+		_log.V(3).Info("ignoring")
+
+	case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
+		return r.createObject(ctx, co, namespace)
+
+	case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
+		return r.updateObject(ctx, co, typedObject, namespace)
+
+	case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
+		return r.deleteObject(ctx, co, typedObject)
+	}
+
+	return nil
+}
+
+// create the typedobject
+func (r *ClusterObjectReconciler) createObject(ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+
+	var _log = log.FromContext(ctx).WithValues(
+		"apiVersion", co.Resource.GetAPIVersion(),
+		"kind", co.Resource.GetKind(),
+		"name", co.Resource.GetName(),
+		"namespace", co.Resource.GetName(),
+	)
+
+	_log.V(3).Info("creating")
+
+	// create the new object, as a blueprint, to create it in the cluster
+	typedObject := co.Resource.DeepCopy()
+
+	// change the namespace, to the requested namespace
 	typedObject.SetNamespace(namespace.Name)
 
 	// set the owners reference
@@ -234,62 +270,133 @@ func (r *ClusterObjectReconciler) ReconcileObjectForNamespace(ctx context.Contex
 
 		_log.Error(err, "unable to set owners reference")
 
-		r.Recorder.Eventf(co, "Warning", "SettingOwnerReferenceError",
-			"unable to set owners reference: %v", err)
+		r.Recorder.Eventf(co, "Warning", "SettingOwnerReferenceError", "unable to set owners reference: %v", err)
 
 		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
 			"FailedToSetOwnerReference", "unable to set owners reference: %v", err); e != nil {
+
+			return e
+		}
+
+		return err
+	}
+
+	// create the object in the cluster
+	if err := r.Create(ctx, typedObject, &client.CreateOptions{}); err != nil {
+
+		_log.Error(err, "error creating object in namespace")
+
+		r.Recorder.Eventf(co, "Warning", "CreatingObjectInNamespaceError",
+			"error creating object in namespace [%s]: %v", namespace.Name, err)
+
+		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedCreatingObject", "error creating object: %v", err); e != nil {
+
 			return e
 		}
 		return err
 	}
 
-	// after calculating the current state, handle the 4 cases
-	switch {
-	case !shouldExist && !doesExist: // --------------------------------------------------------- case 1 -> ignore
-		_log.V(3).Info("ignoring")
+	return nil
+}
 
-	case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
-		_log.V(3).Info("creating")
-		if err := r.Create(ctx, typedObject, &client.CreateOptions{}); err != nil {
-			_log.Error(err, "error creating object")
+// update the typedobject, if it belongs to the given clusterobject
+func (r *ClusterObjectReconciler) updateObject(ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured, namespace corev1.Namespace) error {
 
-			r.Recorder.Eventf(co, "Warning", "CreatingObjectError", "error creating object: %v", err)
+	var _log = log.FromContext(ctx).WithValues(
+		"apiVersion", typedObject.GetAPIVersion(),
+		"kind", typedObject.GetKind(),
+		"name", typedObject.GetName(),
+		"namespace", typedObject.GetName(),
+	)
 
-			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-				"FailedCreatingObject", "error creating object: %v", err); e != nil {
-				return e
-			}
-			return err
+	_log.V(3).Info("updating")
+
+	// check if the found item belongs to the clusterobject reference
+	if !slices.Contains(typedObject.GetOwnerReferences(), *metav1.NewControllerRef(co, co.GroupVersionKind())) {
+
+		_log.V(3).Info("object does not contain ownerreference, blocking update",
+			"ownerref.UID", co.GetUID(),
+			"ownerref.Name", co.GetName(),
+			"gvk", co.GroupVersionKind().String())
+
+		return nil
+	}
+
+	// update the values of the tempObject
+	typedObject = co.Resource.DeepCopy()
+	typedObject.SetNamespace(namespace.Name)
+
+	// set the owners reference again
+	// this is required for watching the dependent objects
+	if err := controllerutil.SetControllerReference(co, typedObject, r.Scheme); err != nil {
+
+		_log.Error(err, "unable to set owners reference")
+
+		r.Recorder.Eventf(co, "Warning", "SettingOwnerReferenceError", "unable to set owners reference: %v", err)
+
+		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedToSetOwnerReference", "unable to set owners reference: %v", err); e != nil {
+
+			return e
 		}
 
-	case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
-		_log.V(3).Info("updating")
-		if err := r.Update(ctx, typedObject, &client.UpdateOptions{}); err != nil {
-			_log.Error(err, "error updating object")
+		return err
+	}
 
-			r.Recorder.Eventf(co, "Warning", "UpdatingObjectError", "error updating object: %v", err)
+	// update the object
+	if err := r.Update(ctx, typedObject, &client.UpdateOptions{}); err != nil {
+		_log.Error(err, "error updating object")
 
-			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-				"FailedUpdatingObject", "error updating object: %v", err); e != nil {
-				return e
-			}
-			return err
+		r.Recorder.Eventf(co, "Warning", "UpdatingObjectError", "error updating object: %v", err)
+
+		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedUpdatingObject", "error updating object: %v", err); e != nil {
+			return e
 		}
+		return err
+	}
 
-	case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
-		_log.V(3).Info("deleting")
-		if err := r.Delete(ctx, typedObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-			_log.Error(err, "error deleting object")
+	return nil
+}
 
-			r.Recorder.Eventf(co, "Warning", "DeletingObjectError", "error deleting object: %v", err)
+// remove the typedobject, if it belongs to the given clusterobject
+func (r *ClusterObjectReconciler) deleteObject(ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured) error {
 
-			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-				"FailedDeletingObject", "error deleting object: %v", err); e != nil {
-				return e
-			}
-			return err
+	var _log = log.FromContext(ctx).WithValues(
+		"apiVersion", typedObject.GetAPIVersion(),
+		"kind", typedObject.GetKind(),
+		"name", typedObject.GetName(),
+		"namespace", typedObject.GetName(),
+	)
+
+	_log.V(3).Info("deleting")
+
+	// check if the found item belongs to the clusterobject reference
+	if !slices.Contains(typedObject.GetOwnerReferences(), *metav1.NewControllerRef(co, co.GroupVersionKind())) {
+
+		_log.V(3).Info("object does not contain ownerreference, blocking deletion",
+			"ownerref.UID", co.GetUID(),
+			"ownerref.Name", co.GetName(),
+			"gvk", co.GroupVersionKind().String())
+
+		return nil
+	}
+
+	// delete the object
+	if err := r.Delete(ctx, typedObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+
+		_log.Error(err, "error deleting object")
+
+		r.Recorder.Eventf(co, "Warning", "DeletingObjectError", "error deleting object: %v", err)
+
+		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedDeletingObject", "error deleting object: %v", err); e != nil {
+
+			return e
 		}
+		return err
+
 	}
 
 	return nil

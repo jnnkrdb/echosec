@@ -97,7 +97,12 @@ func init() {
 	SchemeBuilder.Register(&ClusterObject{}, &ClusterObjectList{})
 }
 
-// -------------------------------------------------------- conditions
+// -------------------------------------------------------- helpers
+
+func (co *ClusterObject) GetSubresourceFinalizer() string {
+	return fmt.Sprintf("%s.%s", finalizer, co.GetUID())
+}
+
 const (
 	Condition_Ready = "Ready"
 )

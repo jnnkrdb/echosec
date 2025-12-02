@@ -38,7 +38,7 @@ var (
 )
 
 // finalization and garbage collection
-const Finalizer string = "v1alpha1.cluster.jnnkrdb.de/finalizer"
+const finalizer string = "v1alpha1.cluster.jnnkrdb.de/finalizer"
 const LabelSourceObject string = "echosec.jnnkrdb.de/src.object"
 
 // creating labeselector, to receive all objects, which were cloned
