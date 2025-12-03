@@ -11,9 +11,16 @@ namespaceRegexRules:
   match:
     - '.*'
 resource:
-  apiVersion: v1
-  kind: ConfigMap
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
   metadata:
-    name: test-cm
-  data:
-    test-data: This is a test
+    name: test-role
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - namespaces
+      verbs:
+        - get
+        - list
+        - watch
