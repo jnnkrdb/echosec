@@ -78,7 +78,7 @@ func main() {
 
 	opts := zap.Options{
 		Development: true,
-		//Encoder:     zapcore.NewConsoleEncoder(zapcore.EncoderConfig{}),
+		// Encoder:     zapcore.NewConsoleEncoder(zapcore.EncoderConfig{}),
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
