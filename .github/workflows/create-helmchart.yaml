@@ -72,7 +72,7 @@ jobs:
         with:
           name: ${{ env.HELM_CHART }}
           repository: jnnkrdb
-          tag: h-${{ needs.version.outputs.semver }}
+          tag: ${{ needs.version.outputs.semver }}
           path: ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} # Default charts/{name}
           registry: ghcr.io
           registry_username: ${{ github.actor }}
