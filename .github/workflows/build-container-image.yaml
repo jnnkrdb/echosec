@@ -77,8 +77,10 @@ jobs:
           file: ${{ env.DOCKERFILE }}
           tags: |
             ${{ env.REPOSITORY }}:${{ env.BRANCH_NAME }}
-          #  ${{ env.REPOSITORY }}:${{ needs.version.outputs.semver }}
+            ${{ env.REPOSITORY }}:${{ needs.version.outputs.semver }}
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
-            VERSION_ARG=${{ needs.version.outputs.semver }}
+            VERSION=${{ needs.version.outputs.semver }}
+            BRANCH=${{ env.BRANCH_NAME }}
+            
               
