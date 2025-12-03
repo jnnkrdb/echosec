@@ -72,11 +72,10 @@ jobs:
         with:
           name: ${{ env.HELM_CHART }}
           repository: jnnkrdb
-          tag: ${{ needs.version.outputs.semver }}
+          tag: h-${{ needs.version.outputs.semver }}
           path: ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} # Default charts/{name}
           registry: ghcr.io
           registry_username: ${{ github.actor }}
           registry_password: ${{ secrets.GHP_TOKEN }}
           update_dependencies: 'true' # Defaults to false
 
-# helm pull ghcr.io/appany/my-chart:0.1.0
