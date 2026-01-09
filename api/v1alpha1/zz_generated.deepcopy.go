@@ -39,6 +39,11 @@ func (in *ClusterObject) DeepCopyInto(out *ClusterObject) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.RegexRules.DeepCopyInto(&out.RegexRules)
+	if in.LabelSelector != nil {
+		in, out := &in.LabelSelector, &out.LabelSelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Resource.DeepCopyInto(&out.Resource)
 	in.Status.DeepCopyInto(&out.Status)
 }
