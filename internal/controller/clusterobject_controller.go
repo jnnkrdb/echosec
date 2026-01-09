@@ -83,10 +83,23 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
+	if err != nil {
+		_log.Error(err, "error fetching labelselector from clusterobject")
+		r.Recorder.Eventf(co, "Warning", "LabelSelectorFetchingError", "error fetching labelselector: %v", err)
+		if e := co.SetCondition(
+			ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
+			"FailedToFetchLabelSelector", "error fetching labelselector: %v", err,
+		); e != nil {
+			return ctrl.Result{}, e
+		}
+		return ctrl.Result{}, err
+	}
+
 	// request a list of namespaces, to parse through the list and
 	// then check every namespace with the give item
 	var namespaces = &corev1.NamespaceList{}
-	if err := r.List(ctx, namespaces, &client.ListOptions{}); err != nil {
+	if err := r.List(ctx, namespaces, &client.ListOptions{LabelSelector: labelselector}); err != nil {
 
 		_log.Error(err, "error fetching list of namespaces from cluster")
 
@@ -166,7 +179,8 @@ following cases should be considered:
  3. secret should exist and it exists -> update
  4. secret should not exist but does exist -> delete
 */
-func (r *ClusterObjectReconciler) reconcileObjectForNamespace(ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
+	ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
 
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", co.Resource.GetAPIVersion(),
@@ -247,7 +261,8 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(ctx context.Contex
 }
 
 // create the typedobject
-func (r *ClusterObjectReconciler) createObject(ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+func (r *ClusterObjectReconciler) createObject(
+	ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
 
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", co.Resource.GetAPIVersion(),
@@ -301,7 +316,8 @@ func (r *ClusterObjectReconciler) createObject(ctx context.Context, co *clusterv
 }
 
 // update the typedobject, if it belongs to the given clusterobject
-func (r *ClusterObjectReconciler) updateObject(ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured, namespace corev1.Namespace) error {
+func (r *ClusterObjectReconciler) updateObject(
+	ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured, namespace corev1.Namespace) error {
 
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", typedObject.GetAPIVersion(),
@@ -361,7 +377,8 @@ func (r *ClusterObjectReconciler) updateObject(ctx context.Context, co *clusterv
 }
 
 // remove the typedobject, if it belongs to the given clusterobject
-func (r *ClusterObjectReconciler) deleteObject(ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured) error {
+func (r *ClusterObjectReconciler) deleteObject(
+	ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured) error {
 
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", typedObject.GetAPIVersion(),
