@@ -75,6 +75,9 @@ type ClusterObject struct {
 	// +optional
 	RegexRules NamespaceRegexRules `json:"namespaceRegexRules"`
 
+	// +optional
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,4,opt,name=labelSelector"`
+
 	// +required
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Resource unstructured.Unstructured `json:"resource"`
