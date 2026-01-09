@@ -36,12 +36,12 @@ func TestRegexListContains(t *testing.T) {
 			// pretty weird checks, but if it is expected, that the function fails,
 			// and the function does in fact not fail, then the test also fails
 			if (err != nil) != trc.ExpectFailure {
-				subT.Fatalf("TestRgxContains is expected to fail: %t // TextRgxContains failed: %t // error message if any: %v", trc.ExpectFailure, (err != nil), err)
+				subT.Fatalf("expected to fail: %t // failed: %t // error message: %v", trc.ExpectFailure, (err != nil), err)
 			}
 
 			// if the check did not fail, did the search string match, if expected?
 			if match != trc.ExpectMatch {
-				subT.Fatalf("TestRgxContains is expected to match: %t // TextRgxContains matched: %t", trc.ExpectMatch, match)
+				subT.Fatalf("expected to match: %t // matched: %t", trc.ExpectMatch, match)
 			}
 		})
 	}
