@@ -104,12 +104,10 @@ type ClusterObjectReconciler struct {
 func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var _log = log.FromContext(ctx)
 
-	// -------------------------------------------------------- meta handling
-	// receive the object, which should be reconciled
 	var co = &clusterv1alpha1.ClusterObject{}
+
 	if err := r.Get(ctx, req.NamespacedName, co, &client.GetOptions{}); err != nil {
-		err = client.IgnoreNotFound(err)
-		if err != nil {
+		if err = client.IgnoreNotFound(err); err != nil {
 			_log.Error(err, "error fetching object from cluster")
 		}
 		return ctrl.Result{}, err
@@ -117,16 +115,10 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	ctx = co.IntoContext(ctx)
 
-	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
-	if err != nil {
-		return ctrl.Result{}, r.throwOnError(ctx, err, "LabelSelectorFetching",
-			"error fetching labelselector from clusterobject")
-	}
-
 	// request a list of namespaces, to parse through the list and
 	// then check every namespace with the give item
 	var namespaces = &corev1.NamespaceList{}
-	if err := r.List(ctx, namespaces, &client.ListOptions{LabelSelector: labelselector}); err != nil {
+	if err := r.List(ctx, namespaces, &client.ListOptions{}); err != nil {
 		return ctrl.Result{}, r.throwOnError(ctx, err, "NamespaceGathering",
 			"error fetching list of namespaces from cluster")
 	}
@@ -173,6 +165,18 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 	)
 
 	_log.V(3).Info("check object")
+
+	// calculating list of required namespaces
+	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
+	if err != nil {
+		return r.throwOnError(ctx, err, "LabelSelectorFetching", "error fetching labelselector from clusterobject")
+	}
+	var requiredNamespaces = &corev1.NamespaceList{}
+	if err := r.List(ctx, requiredNamespaces, &client.ListOptions{LabelSelector: labelselector}); err != nil {
+		return r.throwOnError(ctx, err, "NamespaceGathering", "error fetching list of namespaces from cluster")
+	}
+
+	_log.V(3).Info("calculated required namespaces", "requiredNamespaces", *requiredNamespaces)
 
 	// check, if the object should exist in the namespace
 	shouldExist, err := co.RegexRules.ShouldExistInNamespace(namespace.Name)

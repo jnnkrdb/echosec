@@ -88,6 +88,7 @@ func main() {
 	// printing out the build information
 	setupLog.Info("starting echosec controller",
 		"version", os.Getenv("VERSION"),
+		"branch", os.Getenv("BRANCH"),
 	)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
