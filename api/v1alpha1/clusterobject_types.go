@@ -107,7 +107,8 @@ func (co *ClusterObject) IntoContext(ctx context.Context) context.Context {
 }
 
 func (co *ClusterObject) FromContext(ctx context.Context) error {
-	if co, ok := ctx.Value(ClusterObject{}).(*ClusterObject); !ok { //nolint:staticcheck
+	co, ok := ctx.Value(ClusterObject{}).(*ClusterObject) //nolint:staticcheck
+	if !ok {
 		return fmt.Errorf("invalid value from context: %v", co)
 	}
 	return nil
