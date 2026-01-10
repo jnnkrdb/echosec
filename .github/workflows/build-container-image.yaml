@@ -76,7 +76,7 @@ jobs:
           context: "."
           file: ${{ env.DOCKERFILE }}
           tags: |
-            ${{ env.REPOSITORY }}:mgr.${{ env.BRANCH_NAME }}
+            ${{ env.REPOSITORY }}:mgr.${{ replace(env.BRANCH_NAME, '/', '-') }}
             ${{ env.REPOSITORY }}:mgr.${{ needs.version.outputs.semver }}
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
