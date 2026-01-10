@@ -6,5 +6,6 @@ resources:
   - cluster_v1alpha1_clusterobject-3.yaml
   - cluster_v1alpha1_clusterobject-4.yaml
   - cluster_v1alpha1_clusterobject-5.yaml
+  - cluster_v1alpha1_clusterobject-6.yaml
 
 # +kubebuilder:scaffold:manifestskustomizesamples
