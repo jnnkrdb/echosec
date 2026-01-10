@@ -49,7 +49,7 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 	var _log = log.FromContext(ctx)
 
 	// log the message with the error in the binary logs
-	_log.Error(err, "%s", msg)
+	_log.Error(err, msg)
 
 	var co = &clusterv1alpha1.ClusterObject{}
 	if err := co.FromContext(ctx); err != nil {
