@@ -102,14 +102,12 @@ func init() {
 
 // -------------------------------------------------------- helpers
 
-const ctxInjector = "ClusterObject{}"
-
 func (co *ClusterObject) IntoContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxInjector, co)
+	return context.WithValue(ctx, ClusterObject{}, co) //nolint:staticcheck
 }
 
 func (co *ClusterObject) FromContext(ctx context.Context) error {
-	if co, ok := ctx.Value(ctxInjector).(*ClusterObject); !ok {
+	if co, ok := ctx.Value(ClusterObject{}).(*ClusterObject); !ok { //nolint:staticcheck
 		return fmt.Errorf("invalid value from context: %v", co)
 	}
 	return nil
