@@ -40,6 +40,12 @@ import (
 //   - ctx context.Contex -> this is the default given context
 //   - err error          -> this is the thrown error, which should be handled
 func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, event, msg string) error {
+
+	// if the error is in fact nil, then leave early
+	if err == nil {
+		return err
+	}
+
 	var _log = log.FromContext(ctx)
 
 	// log the message with the error in the binary logs

@@ -46,6 +46,38 @@ import (
 	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
 )
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *ClusterObjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&clusterv1alpha1.ClusterObject{}).
+		Named("clusterobject").
+		WithEventFilter(
+			predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicate.ResourceVersionChangedPredicate{},
+			),
+		).
+		Watches(
+			&corev1.Namespace{},
+			handler.EnqueueRequestsFromMapFunc(
+				func(ctx context.Context, obj client.Object) (requests []reconcile.Request) {
+					var _log = log.FromContext(ctx)
+					// trigger reconciliation for all clusterobjects
+					var list = &clusterv1alpha1.ClusterObjectList{}
+					if err := mgr.GetClient().List(ctx, list, &client.ListOptions{}); err != nil {
+						_log.Error(err, "error receiving list of clusterobjects, cannot invoke reconciliation")
+						return
+					}
+					for _, co := range list.Items {
+						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Name: co.Name}})
+					}
+					return
+				},
+			),
+		).
+		Complete(r)
+}
+
 // ClusterObjectReconciler reconciles a ClusterObject object
 type ClusterObjectReconciler struct {
 	client.Client
@@ -100,7 +132,6 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	for _, namespace := range namespaces.Items {
-
 		// reconcile the object for a specific namespace, if an error occurs, then throw reconcile error
 		if err := r.reconcileObjectForNamespace(ctx, co, namespace); err != nil {
 			return ctrl.Result{}, err
@@ -118,38 +149,6 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		co.Resource.GetKind(),
 		co.Resource.GetName(),
 	)
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ClusterObjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&clusterv1alpha1.ClusterObject{}).
-		Named("clusterobject").
-		WithEventFilter(
-			predicate.Or(
-				predicate.GenerationChangedPredicate{},
-				predicate.ResourceVersionChangedPredicate{},
-			),
-		).
-		Watches(
-			&corev1.Namespace{},
-			handler.EnqueueRequestsFromMapFunc(
-				func(ctx context.Context, obj client.Object) (requests []reconcile.Request) {
-					var _log = log.FromContext(ctx)
-					// trigger reconciliation for all clusterobjects
-					var list = &clusterv1alpha1.ClusterObjectList{}
-					if err := mgr.GetClient().List(ctx, list, &client.ListOptions{}); err != nil {
-						_log.Error(err, "error receiving list of clusterobjects, cannot invoke reconciliation")
-						return
-					}
-					for _, co := range list.Items {
-						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Name: co.Name}})
-					}
-					return
-				},
-			),
-		).
-		Complete(r)
 }
 
 // ------------------------------------------------------ status functions
@@ -175,49 +174,24 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 
 	_log.V(3).Info("check object")
 
-	var shouldExist, doesExist bool
-
 	// check, if the object should exist in the namespace
-	if se, err := co.RegexRules.ShouldExistInNamespace(namespace.Name); err != nil {
-
-		_log.Error(err, "error calculating wether the item should exist or not")
-
-		r.Recorder.Eventf(co, "Warning", "CalculatingNamespaceError",
-			"error calculating wether the item should exist or not: %v", err)
-
-		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedToCalculateNamespace", "error calculating wether the item should exist or not: %v", err); e != nil {
-			return e
-		}
-
-		return err
-
-	} else {
-
-		shouldExist = se
+	shouldExist, err := co.RegexRules.ShouldExistInNamespace(namespace.Name)
+	if err != nil {
+		return r.throwOnError(ctx, err, "NamespaceCalculating", "error calculating wether the item should exist or not")
 	}
 
+	var doesExist bool = false
 	var typedObject = co.Resource.DeepCopy()
 	// check, if the requested object does exist in the namespace
-	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: co.Resource.GetName()},
-		typedObject, &client.GetOptions{}); err != nil {
+	if err := r.Get(ctx,
+		types.NamespacedName{
+			Namespace: namespace.Name,
+			Name:      co.Resource.GetName(),
+		}, typedObject, &client.GetOptions{}); err != nil {
 
 		if client.IgnoreNotFound(err) != nil {
-
-			_log.Error(err, "error receiving the object from the cluster")
-
-			r.Recorder.Eventf(co, "Warning", "ReceivingClusterObjectError",
-				"error receiving the object from the cluster: %v", err)
-
-			if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-				"FailedToReceiveObjectFromCluster", "error receiving the object from the cluster: %v", err); e != nil {
-				return e
-			}
-
-			return err
+			return r.throwOnError(ctx, err, "ClusterObjectFetching", "error receiving the object from the cluster")
 		}
-
-		doesExist = false
 
 	} else {
 
@@ -232,13 +206,13 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 		_log.V(3).Info("ignoring")
 
 	case shouldExist && !doesExist: // --------------------------------------------------------- case 2 -> create
-		return r.createObject(ctx, co, namespace)
+		return r.createObject(log.IntoContext(ctx, _log), co, namespace)
 
 	case shouldExist && doesExist: // --------------------------------------------------------- case 3 -> update
-		return r.updateObject(ctx, co, typedObject, namespace)
+		return r.updateObject(log.IntoContext(ctx, _log), co, typedObject, namespace)
 
 	case !shouldExist && doesExist: // --------------------------------------------------------- case 4 -> delete
-		return r.deleteObject(ctx, co, typedObject)
+		return r.deleteObject(log.IntoContext(ctx, _log), co, typedObject)
 	}
 
 	return nil
@@ -248,12 +222,7 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 func (r *ClusterObjectReconciler) createObject(
 	ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
 
-	var _log = log.FromContext(ctx).WithValues(
-		"apiVersion", co.Resource.GetAPIVersion(),
-		"kind", co.Resource.GetKind(),
-		"name", co.Resource.GetName(),
-		"namespace", co.Resource.GetName(),
-	)
+	var _log = log.FromContext(ctx).WithValues()
 
 	_log.V(3).Info("creating")
 
@@ -266,34 +235,12 @@ func (r *ClusterObjectReconciler) createObject(
 	// set the owners reference
 	// this is required for watching the dependent objects
 	if err := controllerutil.SetControllerReference(co, typedObject, r.Scheme); err != nil {
-
-		_log.Error(err, "unable to set owners reference")
-
-		r.Recorder.Eventf(co, "Warning", "SettingOwnerReferenceError", "unable to set owners reference: %v", err)
-
-		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedToSetOwnerReference", "unable to set owners reference: %v", err); e != nil {
-
-			return e
-		}
-
-		return err
+		return r.throwOnError(ctx, err, "OwnerReferenceConfiguration", "unable to set owners reference")
 	}
 
 	// create the object in the cluster
 	if err := r.Create(ctx, typedObject, &client.CreateOptions{}); err != nil {
-
-		_log.Error(err, "error creating object in namespace")
-
-		r.Recorder.Eventf(co, "Warning", "CreatingObjectInNamespaceError",
-			"error creating object in namespace [%s]: %v", namespace.Name, err)
-
-		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedCreatingObject", "error creating object: %v", err); e != nil {
-
-			return e
-		}
-		return err
+		return r.throwOnError(ctx, err, "ObjectCreation", "error creating object in namespace")
 	}
 
 	return nil
@@ -330,31 +277,12 @@ func (r *ClusterObjectReconciler) updateObject(
 	// set the owners reference again
 	// this is required for watching the dependent objects
 	if err := controllerutil.SetControllerReference(co, typedObject, r.Scheme); err != nil {
-
-		_log.Error(err, "unable to set owners reference")
-
-		r.Recorder.Eventf(co, "Warning", "SettingOwnerReferenceError", "unable to set owners reference: %v", err)
-
-		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedToSetOwnerReference", "unable to set owners reference: %v", err); e != nil {
-
-			return e
-		}
-
-		return err
+		return r.throwOnError(ctx, err, "OwnerReferenceConfiguration", "unable to set owners reference")
 	}
 
 	// update the object
 	if err := r.Update(ctx, typedObject, &client.UpdateOptions{}); err != nil {
-		_log.Error(err, "error updating object")
-
-		r.Recorder.Eventf(co, "Warning", "UpdatingObjectError", "error updating object: %v", err)
-
-		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedUpdatingObject", "error updating object: %v", err); e != nil {
-			return e
-		}
-		return err
+		return r.throwOnError(ctx, err, "ObjectUpdate", "error updating object")
 	}
 
 	return nil
@@ -386,18 +314,7 @@ func (r *ClusterObjectReconciler) deleteObject(
 
 	// delete the object
 	if err := r.Delete(ctx, typedObject, &client.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-
-		_log.Error(err, "error deleting object")
-
-		r.Recorder.Eventf(co, "Warning", "DeletingObjectError", "error deleting object: %v", err)
-
-		if e := co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedDeletingObject", "error deleting object: %v", err); e != nil {
-
-			return e
-		}
-		return err
-
+		return r.throwOnError(ctx, err, "ObjectDeletion", "error deleting object")
 	}
 
 	return nil
