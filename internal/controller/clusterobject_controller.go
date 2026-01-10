@@ -115,7 +115,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	ctx = context.WithValue(ctx, clusterv1alpha1.ClusterObject{}, co)
+	ctx = co.IntoContext(ctx)
 
 	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
 	if err != nil {
