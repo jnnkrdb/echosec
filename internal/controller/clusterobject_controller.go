@@ -83,36 +83,20 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	ctx = context.WithValue(ctx, clusterv1alpha1.ClusterObject{}, co)
+
 	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
 	if err != nil {
-		_log.Error(err, "error fetching labelselector from clusterobject")
-		r.Recorder.Eventf(co, "Warning", "LabelSelectorFetchingError", "error fetching labelselector: %v", err)
-		if e := co.SetCondition(
-			ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedToFetchLabelSelector", "error fetching labelselector: %v", err,
-		); e != nil {
-			return ctrl.Result{}, e
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, r.throwOnError(ctx, err, "LabelSelectorFetching",
+			"error fetching labelselector from clusterobject")
 	}
 
 	// request a list of namespaces, to parse through the list and
 	// then check every namespace with the give item
 	var namespaces = &corev1.NamespaceList{}
 	if err := r.List(ctx, namespaces, &client.ListOptions{LabelSelector: labelselector}); err != nil {
-
-		_log.Error(err, "error fetching list of namespaces from cluster")
-
-		r.Recorder.Eventf(co, "Warning", "ListNamespacesError", "error listing namespaces: %v", err)
-
-		if e := co.SetCondition(
-			ctx, r.Client, clusterv1alpha1.Condition_Ready, metav1.ConditionFalse,
-			"FailedToListNamespaces", "error listing namespaces: %v", err,
-		); e != nil {
-			return ctrl.Result{}, e
-		}
-
-		return ctrl.Result{}, err
+		return ctrl.Result{}, r.throwOnError(ctx, err, "NamespaceGathering",
+			"error fetching list of namespaces from cluster")
 	}
 
 	for _, namespace := range namespaces.Items {
