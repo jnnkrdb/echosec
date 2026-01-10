@@ -4,7 +4,7 @@ description: Deploy EchoSec Operator for cluster-wide configmap and secret mirro
 type: application
 version: 0.1.0
 home: https://github.com/jnnkrdb/echosec
-appVersion: master
+appVersion: mgr.dev
 maintainers:
   - name: jnnkrdb
 keywords:
