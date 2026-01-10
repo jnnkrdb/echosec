@@ -14,6 +14,6 @@ resource:
   apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: test-cm
+    name: test-cm-0
   data:
     test-data: This is a test

@@ -10,8 +10,9 @@ labelSelector:
     - key: kubernetes.io/metadata.name
       operator: In
       values:
+        - whoami
         - default
-        - kube-
+        - echosec-dev
 resource:
   apiVersion: v1
   kind: ConfigMap
