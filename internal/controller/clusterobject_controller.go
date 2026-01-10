@@ -180,7 +180,7 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 		return r.throwOnError(ctx, err, "NamespaceCalculating", "error calculating wether the item should exist or not")
 	}
 
-	var doesExist bool = false
+	var doesExist = false
 	var typedObject = co.Resource.DeepCopy()
 	// check, if the requested object does exist in the namespace
 	if err := r.Get(ctx,

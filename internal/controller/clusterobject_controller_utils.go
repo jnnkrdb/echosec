@@ -51,10 +51,10 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 	// log the message with the error in the binary logs
 	_log.Error(err, "%s", msg)
 
-	co, ok := ctx.Value(clusterv1alpha1.ClusterObject{}).(*clusterv1alpha1.ClusterObject)
-	if !ok {
-		_log.Error(fmt.Errorf("invalid value from context: %v", co), "error reading clusterobject from context")
-		return fmt.Errorf("invalid value from context: %v", co)
+	var co = &clusterv1alpha1.ClusterObject{}
+	if err := co.FromContext(ctx); err != nil {
+		_log.Error(err, "error reading clusterobject from context")
+		return err
 	}
 
 	// throw the event to the object

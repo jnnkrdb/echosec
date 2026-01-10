@@ -102,6 +102,17 @@ func init() {
 
 // -------------------------------------------------------- helpers
 
+func (co *ClusterObject) IntoContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ClusterObject{}, co)
+}
+
+func (co *ClusterObject) FromContext(ctx context.Context) error {
+	if co, ok := ctx.Value(ClusterObject{}).(*ClusterObject); !ok {
+		return fmt.Errorf("invalid value from context: %v", co)
+	}
+	return nil
+}
+
 func (co *ClusterObject) GetSubresourceFinalizer() string {
 	return fmt.Sprintf("%s.%s", finalizer, co.GetUID())
 }
