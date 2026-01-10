@@ -103,12 +103,12 @@ func init() {
 // -------------------------------------------------------- helpers
 var cmp = ClusterObject{}
 
-//nolint:staticcheck
+// nolint:staticcheck
 func (co *ClusterObject) IntoContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, cmp, co)
 }
 
-//nolint:staticcheck
+// nolint:staticcheck
 func (co *ClusterObject) FromContext(ctx context.Context) error {
 	if co, ok := ctx.Value(cmp).(*ClusterObject); !ok {
 		return fmt.Errorf("invalid value from context: %v", co)
