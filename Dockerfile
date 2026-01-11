@@ -29,6 +29,8 @@ LABEL org.opencontainers.image.source=https://github.com/jnnkrdb/echosec
 # set envs from args
 ARG VERSION="latest"
 ENV VERSION=${VERSION}
+ARG BRANCH="-"
+ENV BRANCH=${BRANCH}
 
 WORKDIR /
 COPY --from=builder /workspace/echosec .
