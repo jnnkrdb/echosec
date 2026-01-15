@@ -123,9 +123,21 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			"error fetching list of namespaces from cluster")
 	}
 
+	// request a list of namespaces, which are required to inherit the defined object
+	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
+	if err != nil {
+		return ctrl.Result{}, r.throwOnError(ctx, err, "LabelSelectorFetching", "error fetching labelselector from clusterobject")
+	}
+	var requiredNamespaces = &corev1.NamespaceList{}
+	if err := r.List(ctx, requiredNamespaces, &client.ListOptions{LabelSelector: labelselector}); err != nil {
+		return ctrl.Result{}, r.throwOnError(ctx, err, "NamespaceGathering", "error fetching list of namespaces from cluster")
+	}
+	_log.V(3).Info("calculated required namespaces", "requiredNamespaces", *requiredNamespaces)
+
+	// parse through all namespaces and check each for the defined object
 	for _, namespace := range namespaces.Items {
 		// reconcile the object for a specific namespace, if an error occurs, then throw reconcile error
-		if err := r.reconcileObjectForNamespace(ctx, co, namespace); err != nil {
+		if err := r.reconcileObjectForNamespace(ctx, namespace, requiredNamespaces); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -154,8 +166,12 @@ following cases should be considered:
  3. secret should exist and it exists -> update
  4. secret should not exist but does exist -> delete
 */
-func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
-	ctx context.Context, co *clusterv1alpha1.ClusterObject, namespace corev1.Namespace) error {
+func (r *ClusterObjectReconciler) reconcileObjectForNamespace(ctx context.Context, namespace corev1.Namespace, requiredNamespaces *corev1.NamespaceList) error {
+
+	var co = &clusterv1alpha1.ClusterObject{}
+	if err := co.FromContext(ctx); err != nil {
+		return r.throwOnError(ctx, err, "ClusterObjectFetching", "error fetching clusterobject from context")
+	}
 
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", co.Resource.GetAPIVersion(),
@@ -166,42 +182,16 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 
 	_log.V(3).Info("check object")
 
-	// calculating list of required namespaces
-	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
-	if err != nil {
-		return r.throwOnError(ctx, err, "LabelSelectorFetching", "error fetching labelselector from clusterobject")
-	}
-	var requiredNamespaces = &corev1.NamespaceList{}
-	if err := r.List(ctx, requiredNamespaces, &client.ListOptions{LabelSelector: labelselector}); err != nil {
-		return r.throwOnError(ctx, err, "NamespaceGathering", "error fetching list of namespaces from cluster")
-	}
+	var typedObject = &unstructured.Unstructured{}
 
-	_log.V(3).Info("calculated required namespaces", "requiredNamespaces", *requiredNamespaces)
+	// check, if the object does exist in the namespace and copy its content to cache
+	doesExist, err := r.objectExists(ctx, namespace.GetName(), typedObject)
+	if err != nil {
+		return r.throwOnError(ctx, err, "ClusterObjectFetching", "error receiving the object from the cluster")
+	}
 
 	// check, if the object should exist in the namespace
-	shouldExist, err := co.RegexRules.ShouldExistInNamespace(namespace.Name)
-	if err != nil {
-		return r.throwOnError(ctx, err, "NamespaceCalculating", "error calculating wether the item should exist or not")
-	}
-
-	var doesExist = false
-	var typedObject = co.Resource.DeepCopy()
-	// check, if the requested object does exist in the namespace
-	if err := r.Get(ctx,
-		types.NamespacedName{
-			Namespace: namespace.Name,
-			Name:      co.Resource.GetName(),
-		}, typedObject, &client.GetOptions{}); err != nil {
-
-		if client.IgnoreNotFound(err) != nil {
-			return r.throwOnError(ctx, err, "ClusterObjectFetching", "error receiving the object from the cluster")
-		}
-
-	} else {
-
-		doesExist = true
-	}
-
+	shouldExist := r.objectShouldExist(namespace, requiredNamespaces)
 	_log.V(3).Info("state calculated", "shouldExist", shouldExist, "doesExist", doesExist)
 
 	// after calculating the current state, handle the 4 cases

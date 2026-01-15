@@ -29,7 +29,11 @@ import (
 	"fmt"
 
 	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -75,4 +79,45 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 		return e
 	}
 	return err
+}
+
+// validate wether an object is existing in a given namespace or not
+func (r *ClusterObjectReconciler) objectExists(ctx context.Context, namespace string, typedObject *unstructured.Unstructured) (bool, error) {
+
+	var _log = log.FromContext(ctx)
+
+	var co = &clusterv1alpha1.ClusterObject{}
+	if err := co.FromContext(ctx); err != nil {
+		_log.Error(err, "error reading clusterobject from context")
+		return false, err
+	}
+
+	// create a short local copy of the requested resource, for the api request
+	typedObject = co.Resource.DeepCopy()
+
+	// check, if the requested object does exist in the namespace
+	if err := r.Get(ctx,
+		types.NamespacedName{
+			Namespace: namespace,
+			Name:      co.Resource.GetName(),
+		}, typedObject, &client.GetOptions{}); err != nil {
+
+		return false, client.IgnoreNotFound(err)
+	}
+
+	return true, nil
+}
+
+// validate wether an object is existing in a given namespace or not
+func (r *ClusterObjectReconciler) objectShouldExist(namespace corev1.Namespace, requiredNamespaces *corev1.NamespaceList) bool {
+
+	for _, checkingNamespace := range requiredNamespaces.Items {
+
+		if checkingNamespace.GetName() == namespace.GetName() {
+
+			return true
+		}
+	}
+
+	return false
 }
