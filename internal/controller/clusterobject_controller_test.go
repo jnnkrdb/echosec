@@ -45,7 +45,7 @@ var _ = Describe("ClusterObject Controller", func() {
 		const resourceName = "test-resource"
 		const resourceNamespace = "test-namespace"
 
-		var testResource = &unstructured.Unstructured{}
+		var testResource = unstructured.Unstructured{}
 		testResource.SetAPIVersion("v1")
 		testResource.SetKind("Secret")
 		testResource.SetName("test-secret")
