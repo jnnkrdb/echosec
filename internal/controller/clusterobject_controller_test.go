@@ -45,7 +45,7 @@ var _ = Describe("ClusterObject Controller", func() {
 		const resourceName = "test-resource"
 		const resourceNamespace = "test-namespace"
 
-		var testResource = unstructured.Unstructured{}
+		var testResource = &unstructured.Unstructured{}
 		testResource.SetAPIVersion("v1")
 		testResource.SetKind("Secret")
 		testResource.SetName("test-secret")
@@ -57,6 +57,7 @@ var _ = Describe("ClusterObject Controller", func() {
 			Name:      resourceName,
 			Namespace: resourceNamespace, // TODO(user):Modify as needed
 		}
+
 		clusterobject := &clusterv1alpha1.ClusterObject{}
 
 		BeforeEach(func() {
@@ -65,10 +66,12 @@ var _ = Describe("ClusterObject Controller", func() {
 			if err != nil && errors.IsNotFound(err) {
 				resource := &clusterv1alpha1.ClusterObject{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: resourceNamespace,
+						Name:      typeNamespacedName.Name,
+						Namespace: typeNamespacedName.Namespace,
 					},
-					Resource: testResource,
+					Replicator: clusterv1alpha1.ClusterObjectReplicator{
+						Resource: testResource,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

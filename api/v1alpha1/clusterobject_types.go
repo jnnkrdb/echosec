@@ -70,19 +70,23 @@ type ClusterObject struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty,omitzero"`
 
+	// +required
+	Replicator ClusterObjectReplicator `json:"replicator"`
+
+	// status defines the observed state of ClusterObject
 	// +optional
-	RegexRules NamespaceRegexRules `json:"namespaceRegexRules"`
+	Status ClusterObjectStatus `json:"status,omitempty,omitzero"`
+}
+
+// ClusterObject i+s the Schema for the clusterobjects API
+type ClusterObjectReplicator struct {
 
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,4,opt,name=labelSelector"`
 
 	// +required
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Resource unstructured.Unstructured `json:"resource"`
-
-	// status defines the observed state of ClusterObject
-	// +optional
-	Status ClusterObjectStatus `json:"status,omitempty,omitzero"`
+	Resource *unstructured.Unstructured `json:"resource"`
 }
 
 // +kubebuilder:object:root=true
