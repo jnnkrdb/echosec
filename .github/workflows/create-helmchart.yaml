@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-       
+      
       - name: Update Dependencies
         run: helm dependency update ${{ env.HELM_CHARTS_DIR }}/${{ env.HELM_CHART }} --debug
 
