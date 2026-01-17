@@ -3,12 +3,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   labels:
-    {{- include "echosec.labels" . | nindent 4 }}
+    {{- include "r8r.labels" . | nindent 4 }}
     {{- include "common.labels" ( dict "labels" (list .Values.global.labels .Values.labels) ) | nindent 4 }}
   annotations:
-    jnnkrdb.de/src: github.com/jnnkrdb/echosec
+    jnnkrdb.de/src: github.com/jnnkrdb/r8r
     {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations .Values.annotations) ) | nindent 4 }}
-  name: {{ include "echosec.fullname" . }}-election-role
+  name: {{ include "r8r.fullname" . }}-election-role
 rules:
 - apiGroups:
   - ""

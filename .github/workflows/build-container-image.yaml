@@ -18,7 +18,7 @@ on:
 env:
   HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
   GITVERSION_FILE: .github/gitversion/GitVersion.yml
-  REPOSITORY: ghcr.io/jnnkrdb/echosec
+  REPOSITORY: ghcr.io/jnnkrdb/r8r
   DOCKERFILE: ./Dockerfile
   VERSION_FILE: ./VERSION
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 

@@ -4,14 +4,14 @@ metadata:
   name: controller
   namespace: system
   labels:
-    control-plane: echosec-controller
-    app.kubernetes.io/name: echosec
+    control-plane: r8r-controller
+    app.kubernetes.io/name: r8r
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
     matchLabels:
       control-plane: controller-manager
-      app.kubernetes.io/name: echosec
+      app.kubernetes.io/name: r8r
   replicas: 1
   template:
     metadata:
@@ -19,7 +19,7 @@ spec:
         kubectl.kubernetes.io/default-container: manager
       labels:
         control-plane: controller-manager
-        app.kubernetes.io/name: echosec
+        app.kubernetes.io/name: r8r
     spec:
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

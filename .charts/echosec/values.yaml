@@ -23,7 +23,7 @@ labels: {}
 # IMAGE CONFIGURATION
 image:
   registry: ghcr.io
-  repository: jnnkrdb/echosec
+  repository: jnnkrdb/r8r
   tag:
   digest:
   pullPolicy: Always
@@ -60,7 +60,7 @@ pod:
   extraEnvs: []
   extraEnvFrom: []
   containers:
-    echosec:
+    r8r:
       command: []
       args: []
       workingDir: ""

@@ -1,9 +1,9 @@
 apiVersion: v2
-name: echosec
-description: Deploy EchoSec Operator for cluster-wide configmap and secret mirroring.
+name: r8r
+description: Deploy Replicator [r8r] Operator for cluster-wide configmap and secret mirroring.
 type: application
 version: 0.1.0
-home: https://github.com/jnnkrdb/echosec
+home: https://github.com/jnnkrdb/r8r
 appVersion: mgr.dev
 maintainers:
   - name: jnnkrdb

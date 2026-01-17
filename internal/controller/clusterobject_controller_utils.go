@@ -28,7 +28,7 @@ import (
 	"context"
 	"fmt"
 
-	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
+	clusterv1alpha1 "github.com/jnnkrdb/r8r/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

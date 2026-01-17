@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-import "github.com/jnnkrdb/echosec/pkg/utils/selection"
+import "github.com/jnnkrdb/r8r/pkg/utils/selection"
 
 // RegexRules defines the rules, which should be used to calculate the
 // requested namespaces
