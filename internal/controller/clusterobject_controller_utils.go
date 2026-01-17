@@ -86,19 +86,11 @@ func (r *ClusterObjectReconciler) objectExists(
 	namespace string,
 	typedObject *unstructured.Unstructured) (bool, error) {
 
-	var _log = log.FromContext(ctx)
-
-	var co = &clusterv1alpha1.ClusterObject{}
-	if err := co.FromContext(ctx); err != nil {
-		_log.Error(err, "error reading clusterobject from context")
-		return false, err
-	}
-
 	// check, if the requested object does exist in the namespace
 	if err := r.Get(ctx,
 		types.NamespacedName{
 			Namespace: namespace,
-			Name:      co.Resource.GetName(),
+			Name:      typedObject.GetName(),
 		}, typedObject, &client.GetOptions{}); err != nil {
 
 		return false, client.IgnoreNotFound(err)
