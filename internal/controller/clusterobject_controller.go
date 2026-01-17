@@ -146,7 +146,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	r.Recorder.Eventf(co, "Normal", "ReconciledObject", "successfully cloned resource in required namespaces")
 
-	return ctrl.Result{}, co.SetCondition(ctx, r.Client, clusterv1alpha1.Condition_Ready,
+	return ctrl.Result{}, r.setCondition(ctx, clusterv1alpha1.Condition_Ready,
 		metav1.ConditionTrue, "DeployedResource",
 		"successfully deployed resource [%s/%s:%s]",
 		co.Resource.GetAPIVersion(),
@@ -166,7 +166,10 @@ following cases should be considered:
  3. secret should exist and it exists -> update
  4. secret should not exist but does exist -> delete
 */
-func (r *ClusterObjectReconciler) reconcileObjectForNamespace(ctx context.Context, namespace corev1.Namespace, requiredNamespaces *corev1.NamespaceList) error {
+func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
+	ctx context.Context,
+	namespace corev1.Namespace,
+	requiredNamespaces *corev1.NamespaceList) error {
 
 	var co = &clusterv1alpha1.ClusterObject{}
 	if err := co.FromContext(ctx); err != nil {
@@ -242,7 +245,10 @@ func (r *ClusterObjectReconciler) createObject(
 
 // update the typedobject, if it belongs to the given clusterobject
 func (r *ClusterObjectReconciler) updateObject(
-	ctx context.Context, co *clusterv1alpha1.ClusterObject, typedObject *unstructured.Unstructured, namespace corev1.Namespace) error {
+	ctx context.Context,
+	co *clusterv1alpha1.ClusterObject,
+	typedObject *unstructured.Unstructured,
+	namespace corev1.Namespace) error {
 
 	var _log = log.FromContext(ctx).WithValues(
 		"apiVersion", typedObject.GetAPIVersion(),

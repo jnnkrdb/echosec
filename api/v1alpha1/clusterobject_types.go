@@ -30,8 +30,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -117,70 +115,3 @@ func (co *ClusterObject) FromContext(ctx context.Context) error {
 const (
 	Condition_Ready = "Ready"
 )
-
-func (co *ClusterObject) FindCondition(ctx context.Context, conditionType string) *metav1.Condition {
-
-	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
-
-	_log.V(5).Info("requested condition")
-
-	for i := range co.Status.Conditions {
-
-		if co.Status.Conditions[i].Type == conditionType {
-
-			_log.V(5).Info("condition found", "condition", co.Status.Conditions[i])
-
-			return &co.Status.Conditions[i]
-		}
-	}
-
-	_log.V(5).Info("condition not found")
-
-	return nil
-}
-
-func (co *ClusterObject) SetCondition(ctx context.Context, c client.Client,
-	t string, s metav1.ConditionStatus, r string, mf string, a ...any) error {
-
-	var _log = log.FromContext(ctx)
-
-	var _condition = co.FindCondition(ctx, t)
-
-	// if there is no condition with the specified type, then create a new condition and
-	// add it to the list of conditions
-	if _condition == nil {
-
-		c := metav1.Condition{
-			Type:               t,
-			Status:             s,
-			ObservedGeneration: co.GetGeneration(),
-			LastTransitionTime: metav1.Now(),
-			Reason:             r,
-			Message:            fmt.Sprintf(mf, a...),
-		}
-
-		_log.V(5).Info("adding condition", "condition", c)
-
-		co.Status.Conditions = append(co.Status.Conditions, c)
-
-	} else {
-
-		// cnage values of the given condition
-		_condition.LastTransitionTime = func() metav1.Time {
-			if _condition.Status != s {
-
-				return metav1.Now()
-			}
-			return _condition.LastTransitionTime
-		}()
-		_condition.Status = s
-		_condition.ObservedGeneration = co.GetGeneration()
-		_condition.Reason = r
-		_condition.Message = fmt.Sprintf(mf, a...)
-
-		_log.V(5).Info("updated condition", "condition", *_condition)
-
-	}
-
-	return c.Status().Update(ctx, co, &client.SubResourceUpdateOptions{})
-}

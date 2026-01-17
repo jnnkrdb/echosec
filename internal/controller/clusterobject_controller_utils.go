@@ -69,8 +69,7 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 	)
 
 	// set the condition if any
-	if e := co.SetCondition(ctx,
-		r.Client,
+	if e := r.setCondition(ctx,
 		clusterv1alpha1.Condition_Ready,
 		metav1.ConditionFalse,
 		fmt.Sprintf("Failed%s", event),
@@ -82,7 +81,10 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 }
 
 // validate wether an object is existing in a given namespace or not
-func (r *ClusterObjectReconciler) objectExists(ctx context.Context, namespace string, typedObject *unstructured.Unstructured) (bool, error) {
+func (r *ClusterObjectReconciler) objectExists(
+	ctx context.Context,
+	namespace string,
+	typedObject *unstructured.Unstructured) (bool, error) {
 
 	var _log = log.FromContext(ctx)
 
@@ -93,7 +95,7 @@ func (r *ClusterObjectReconciler) objectExists(ctx context.Context, namespace st
 	}
 
 	// create a short local copy of the requested resource, for the api request
-	typedObject = co.Resource.DeepCopy()
+	co.Resource.DeepCopyInto(typedObject)
 
 	// check, if the requested object does exist in the namespace
 	if err := r.Get(ctx,
@@ -109,7 +111,9 @@ func (r *ClusterObjectReconciler) objectExists(ctx context.Context, namespace st
 }
 
 // validate wether an object is existing in a given namespace or not
-func (r *ClusterObjectReconciler) objectShouldExist(namespace corev1.Namespace, requiredNamespaces *corev1.NamespaceList) bool {
+func (r *ClusterObjectReconciler) objectShouldExist(
+	namespace corev1.Namespace,
+	requiredNamespaces *corev1.NamespaceList) bool {
 
 	for _, checkingNamespace := range requiredNamespaces.Items {
 
@@ -120,4 +124,91 @@ func (r *ClusterObjectReconciler) objectShouldExist(namespace corev1.Namespace, 
 	}
 
 	return false
+}
+
+// handling conditions
+func (r *ClusterObjectReconciler) findCondition(ctx context.Context, conditionType string) (*metav1.Condition, error) {
+
+	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
+
+	var co = &clusterv1alpha1.ClusterObject{}
+	if err := co.FromContext(ctx); err != nil {
+		_log.Error(err, "error reading clusterobject from context")
+		return nil, err
+	}
+
+	for i := range co.Status.Conditions {
+
+		if co.Status.Conditions[i].Type == conditionType {
+
+			_log.V(5).Info("condition found", "condition", co.Status.Conditions[i])
+
+			return &co.Status.Conditions[i], nil
+		}
+	}
+
+	_log.V(5).Info("condition not found")
+
+	return nil, nil
+}
+
+// set conditions
+func (r *ClusterObjectReconciler) setCondition(
+	ctx context.Context,
+	conditionType string,
+	status metav1.ConditionStatus,
+	reason string,
+	msgf string,
+	a ...any) error {
+
+	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
+
+	var co = &clusterv1alpha1.ClusterObject{}
+	if err := co.FromContext(ctx); err != nil {
+		_log.Error(err, "error reading clusterobject from context")
+		return err
+	}
+
+	_condition, err := r.findCondition(ctx, conditionType)
+	if err != nil {
+		_log.Error(err, "error reading clusterobject from context")
+		return err
+	}
+
+	// if there is no condition with the specified type, then create a new condition and
+	// add it to the list of conditions
+	if _condition == nil {
+
+		c := metav1.Condition{
+			Type:               conditionType,
+			Status:             status,
+			ObservedGeneration: co.GetGeneration(),
+			LastTransitionTime: metav1.Now(),
+			Reason:             reason,
+			Message:            fmt.Sprintf(msgf, a...),
+		}
+
+		_log.V(5).Info("adding condition", "condition", c)
+
+		co.Status.Conditions = append(co.Status.Conditions, c)
+
+	} else {
+
+		// cnage values of the given condition
+		_condition.LastTransitionTime = func() metav1.Time {
+			if _condition.Status != status {
+				return metav1.Now()
+			}
+			return _condition.LastTransitionTime
+		}()
+		_condition.Status = status
+		_condition.ObservedGeneration = co.GetGeneration()
+		_condition.Reason = reason
+		_condition.Message = fmt.Sprintf(msgf, a...)
+
+		_log.V(5).Info("updated condition", "condition", *_condition)
+
+	}
+
+	return r.Status().Update(ctx, co, &client.SubResourceUpdateOptions{})
 }
