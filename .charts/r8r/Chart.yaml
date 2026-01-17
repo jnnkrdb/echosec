@@ -1,6 +1,6 @@
 apiVersion: v2
 name: r8r
-description: Deploy Replicator [r8r] Operator for cluster-wide configmap and secret mirroring.
+description: Deploy Replicator [r8r] Operator for objects, which get replicated into the required Namespaces.
 type: application
 version: 0.1.0
 home: https://github.com/jnnkrdb/r8r
