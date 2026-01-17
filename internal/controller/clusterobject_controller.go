@@ -124,7 +124,7 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// request a list of namespaces, which are required to inherit the defined object
-	labelselector, err := metav1.LabelSelectorAsSelector(co.LabelSelector)
+	labelselector, err := metav1.LabelSelectorAsSelector(co.Replicator.LabelSelector)
 	if err != nil {
 		return ctrl.Result{}, r.throwOnError(ctx, err, "LabelSelectorFetching", "error fetching labelselector from clusterobject")
 	}
@@ -149,9 +149,9 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, r.setCondition(ctx, clusterv1alpha1.Condition_Ready,
 		metav1.ConditionTrue, "DeployedResource",
 		"successfully deployed resource [%s/%s:%s]",
-		co.Resource.GetAPIVersion(),
-		co.Resource.GetKind(),
-		co.Resource.GetName(),
+		co.Replicator.Resource.GetAPIVersion(),
+		co.Replicator.Resource.GetKind(),
+		co.Replicator.Resource.GetName(),
 	)
 }
 
@@ -177,16 +177,16 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 	}
 
 	var _log = log.FromContext(ctx).WithValues(
-		"apiVersion", co.Resource.GetAPIVersion(),
-		"kind", co.Resource.GetKind(),
-		"name", co.Resource.GetName(),
+		"apiVersion", co.Replicator.Resource.GetAPIVersion(),
+		"kind", co.Replicator.Resource.GetKind(),
+		"name", co.Replicator.Resource.GetName(),
 		"namespace", namespace.GetName(),
 	)
 
 	_log.V(3).Info("check object")
 
 	// create copy of resources object
-	var typedObject = co.Resource.DeepCopy()
+	var typedObject = co.Replicator.Resource.DeepCopy()
 
 	_log.V(5).Info("object from resources cached", "*typedObject", *typedObject)
 
@@ -227,7 +227,7 @@ func (r *ClusterObjectReconciler) createObject(
 	_log.V(3).Info("creating")
 
 	// create the new object, as a blueprint, to create it in the cluster
-	typedObject := co.Resource.DeepCopy()
+	typedObject := co.Replicator.Resource.DeepCopy()
 
 	// change the namespace, to the requested namespace
 	typedObject.SetNamespace(namespace.Name)
@@ -274,7 +274,7 @@ func (r *ClusterObjectReconciler) updateObject(
 	}
 
 	// update the values of the tempObject
-	typedObject = co.Resource.DeepCopy()
+	typedObject = co.Replicator.Resource.DeepCopy()
 	typedObject.SetNamespace(namespace.Name)
 
 	// set the owners reference again
