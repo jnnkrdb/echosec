@@ -78,7 +78,7 @@ type ClusterObject struct {
 	Status ClusterObjectStatus `json:"status,omitempty,omitzero"`
 }
 
-// ClusterObject i+s the Schema for the clusterobjects API
+// ClusterObject is the Schema for the clusterobjects API
 type ClusterObjectReplicator struct {
 
 	// +optional
