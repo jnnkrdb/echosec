@@ -185,7 +185,7 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 
 	_log.V(3).Info("check object")
 
-	var typedObject = &unstructured.Unstructured{}
+	var typedObject = co.Resource.DeepCopy()
 
 	// check, if the object does exist in the namespace and copy its content to cache
 	doesExist, err := r.objectExists(ctx, namespace.GetName(), typedObject)

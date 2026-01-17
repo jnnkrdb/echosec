@@ -94,9 +94,6 @@ func (r *ClusterObjectReconciler) objectExists(
 		return false, err
 	}
 
-	// create a short local copy of the requested resource, for the api request
-	co.Resource.DeepCopyInto(typedObject)
-
 	// check, if the requested object does exist in the namespace
 	if err := r.Get(ctx,
 		types.NamespacedName{
