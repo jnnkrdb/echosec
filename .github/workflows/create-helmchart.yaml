@@ -16,7 +16,7 @@ env:
   GITVERSION_FILE: .github/gitversion/GitVersion.yml
   HELM_EXPERIMENTAL_OCI: 1 #enable OCI support
   HELM_CHARTS_DIR: .charts
-  HELM_CHART: echosec
+  HELM_CHART: r8r
 
 jobs:
   version:

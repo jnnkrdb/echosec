@@ -36,8 +36,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	clusterv1alpha1 "github.com/jnnkrdb/echosec/api/v1alpha1"
-	"github.com/jnnkrdb/echosec/internal/controller"
+	clusterv1alpha1 "github.com/jnnkrdb/r8r/api/v1alpha1"
+	"github.com/jnnkrdb/r8r/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -86,7 +86,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// printing out the build information
-	setupLog.Info("starting echosec controller",
+	setupLog.Info("starting r8r controller",
 		"version", os.Getenv("VERSION"),
 		"branch", os.Getenv("BRANCH"),
 	)
@@ -170,7 +170,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "echosec.jnnkrdb.de",
+		LeaderElectionID:       "r8r.jnnkrdb.de",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

@@ -1,4 +1,4 @@
-module github.com/jnnkrdb/echosec
+module github.com/jnnkrdb/r8r
 
 go 1.24.5
 

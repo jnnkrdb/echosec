@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "echosec.fullname" . }}
+  name: {{ include "r8r.fullname" . }}
   labels:
-    {{- include "echosec.labels" . | nindent 4 }}
+    {{- include "r8r.labels" . | nindent 4 }}
     {{- include "common.labels" ( dict "labels" (list .Values.global.labels .Values.labels) ) | nindent 4 }}
   annotations:
-    jnnkrdb.de/src: github.com/jnnkrdb/echosec
+    jnnkrdb.de/src: github.com/jnnkrdb/r8r
     {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations .Values.annotations) ) | nindent 4 }}
 spec:
   replicas: {{ .Values.deployment.replicaCount }}
@@ -18,16 +18,16 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "echosec.selectorLabels" . | nindent 6 }}
+      {{- include "r8r.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
         {{- include "common.annotations" ( dict "annotations" (list .Values.global.annotations .Values.annotations .Values.pod.annotations) ) | nindent 8 }}
       labels:
         {{- include "common.labels" ( dict "labels" (list .Values.global.labels .Values.labels .Values.pod.labels) ) | nindent 8 }}
-        {{- include "echosec.selectorLabels" . | nindent 8 }}
+        {{- include "r8r.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: sa-{{ include "echosec.fullname" . }}
+      serviceAccountName: sa-{{ include "r8r.fullname" . }}
       {{- include "common.images.pullSecrets" ( dict "images" (list .Values.image) "global" .Values.global) | nindent 6 }}
       {{- with .Values.pod.affinity }}
       affinity:
@@ -66,25 +66,25 @@ spec:
         {{- with .Values.pod.sidecarContainers }}
         {{- . | toYaml | nindent 8 }}
         {{- end }}
-        - name: echosec
+        - name: r8r
           image: {{ include "common.images.image" ( dict "imageRoot" .Values.image "global" .Values.global "chart" .Chart ) }}
           imagePullPolicy: {{ include "common.images.pullPolicy" ( dict "imageRoot" .Values.image "global" .Values.global ) }}
-          {{- with .Values.pod.containers.echosec.command }}
+          {{- with .Values.pod.containers.r8r.command }}
           command: 
             {{- . | toYaml | nindent 12 }}
           {{- end }}
-          {{- with .Values.pod.containers.echosec.args }}
+          {{- with .Values.pod.containers.r8r.args }}
           args: 
             {{- . | toYaml | nindent 12 }}
           {{- end }}
-          {{- with .Values.pod.containers.echosec.securityContext }}
+          {{- with .Values.pod.containers.r8r.securityContext }}
           securityContext: 
             {{- . | toYaml | nindent 12 }}
           {{- end }}
-          {{- with .Values.pod.containers.echosec.workingDir }}
+          {{- with .Values.pod.containers.r8r.workingDir }}
           workingDir: {{ . | quote }}
           {{- end }}
-          {{- with .Values.pod.containers.echosec.resources }}
+          {{- with .Values.pod.containers.r8r.resources }}
           resources:
             {{- . | toYaml | nindent 12 }}
           {{- end }}
@@ -95,21 +95,21 @@ spec:
             - name: metrics
               containerPort: 8443
               protocol: TCP 
-          {{- with (concat .Values.pod.containers.echosec.extraVolumeMounts 
+          {{- with (concat .Values.pod.containers.r8r.extraVolumeMounts 
                             .Values.pod.extraVolumeMounts 
                             .Values.global.extraVolumeMounts) }}
           volumeMounts:
             {{- . | toYaml | nindent 12 }}
           {{- end }}
-          {{- with (concat .Values.pod.containers.echosec.extraEnvFrom .Values.pod.extraEnvFrom) }}
+          {{- with (concat .Values.pod.containers.r8r.extraEnvFrom .Values.pod.extraEnvFrom) }}
           envFrom:
             {{- . | toYaml | nindent 12 }}
           {{- end }}
-          {{- with (concat .Values.pod.containers.echosec.extraEnvs .Values.pod.extraEnvs) }}
+          {{- with (concat .Values.pod.containers.r8r.extraEnvs .Values.pod.extraEnvs) }}
           env:
             {{- . | toYaml | nindent 12 }}
           {{- end }}
-          {{- if .Values.pod.containers.echosec.healthz }}
+          {{- if .Values.pod.containers.r8r.healthz }}
           startupProbe:
             httpGet:
               path: /healthz

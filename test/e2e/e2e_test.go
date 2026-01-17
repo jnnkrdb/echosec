@@ -30,20 +30,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/jnnkrdb/echosec/test/utils"
+	"github.com/jnnkrdb/r8r/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "echosec-system"
+const namespace = "r8r-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "echosec-controller-manager"
+const serviceAccountName = "r8r-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "echosec-controller-manager-metrics-service"
+const metricsServiceName = "r8r-controller-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "echosec-metrics-binding"
+const metricsRoleBindingName = "r8r-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
@@ -176,7 +176,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=echosec-metrics-reader",
+				"--clusterrole=r8r-metrics-reader",
 				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
 			)
 			_, err := utils.Run(cmd)
