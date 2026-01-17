@@ -5,18 +5,19 @@ metadata:
     app.kubernetes.io/name: r8r
     app.kubernetes.io/managed-by: kustomize
   name: clusterobject-sample-4
-labelSelector:
-  matchExpressions:
-    - key: kubernetes.io/metadata.name
-      operator: In
-      values:
-        - whoami
-        - default
-        - r8r-dev
-resource:
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: test-cm-4
-  data:
-    test-data: This is a test
+replicator:
+  labelSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values:
+          - whoami
+          - default
+          - r8r-dev
+  resource:
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: test-cm-4
+    data:
+      test-data: This is a test
