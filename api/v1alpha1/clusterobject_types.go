@@ -86,7 +86,7 @@ type ClusterObjectReplicator struct {
 
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +required
-	Resource *unstructured.Unstructured `json:"resource"`
+	Resource unstructured.Unstructured `json:"resource"`
 }
 
 // +kubebuilder:object:root=true
