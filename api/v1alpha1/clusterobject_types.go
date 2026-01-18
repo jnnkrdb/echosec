@@ -25,9 +25,6 @@ SOFTWARE.
 package v1alpha1
 
 import (
-	"context"
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -101,21 +98,3 @@ type ClusterObjectList struct {
 func init() {
 	SchemeBuilder.Register(&ClusterObject{}, &ClusterObjectList{})
 }
-
-// -------------------------------------------------------- helpers
-type ClusterObjectContextKey struct{}
-
-func (co *ClusterObject) IntoContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ClusterObjectContextKey{}, co)
-}
-
-func (co *ClusterObject) FromContext(ctx context.Context) error {
-	if co, ok := ctx.Value(ClusterObjectContextKey{}).(*ClusterObject); !ok {
-		return fmt.Errorf("invalid value from context: %v", co)
-	}
-	return nil
-}
-
-const (
-	Condition_Ready = "Ready"
-)
