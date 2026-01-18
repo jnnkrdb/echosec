@@ -113,6 +113,8 @@ func (r *ClusterObjectReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	_log.V(5).Info("clusterobject content", "*clusterobject", *co)
+
 	ctx = co.IntoContext(ctx)
 
 	// request a list of namespaces, to parse through the list and
@@ -188,7 +190,7 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 	// create copy of resources object
 	var typedObject = co.Replicator.Resource.DeepCopy()
 
-	_log.V(5).Info("object from resources cached", "*typedObject", *typedObject, "*co.Replicator.Resource", *co.Replicator.Resource, "*co", *co)
+	_log.V(5).Info("object from resources cached", "*typedObject", *typedObject, "co.Replicator.Resource", co.Replicator.Resource, "*co", *co)
 
 	// check, if the object does exist in the namespace and copy its content to cache
 	doesExist, err := r.objectExists(ctx, namespace.GetName(), typedObject)
