@@ -43,7 +43,7 @@ import (
 // parameters:
 //   - ctx context.Contex -> this is the default given context
 //   - err error          -> this is the thrown error, which should be handled
-func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, event, msg string) error {
+func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, co *clusterv1alpha1.ClusterObject, err error, event, msg string) error {
 
 	// if the error is in fact nil, then leave early
 	if err == nil {
@@ -55,12 +55,6 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 	// log the message with the error in the binary logs
 	_log.Error(err, msg)
 
-	var co = &clusterv1alpha1.ClusterObject{}
-	if err := co.FromContext(ctx); err != nil {
-		_log.Error(err, "error reading clusterobject from context")
-		return err
-	}
-
 	// throw the event to the object
 	r.Recorder.Eventf(co,
 		"Warning",
@@ -70,7 +64,8 @@ func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, err error, e
 
 	// set the condition if any
 	if e := r.setCondition(ctx,
-		clusterv1alpha1.Condition_Ready,
+		co,
+		Condition_Ready,
 		metav1.ConditionFalse,
 		fmt.Sprintf("Failed%s", event),
 		"%s: %v", msg, err,
@@ -117,16 +112,19 @@ func (r *ClusterObjectReconciler) objectShouldExist(
 	return false
 }
 
+// ----------------------------------------------------------------------------------------------------------------------- conditions
+
+const (
+	Condition_Ready = "Ready"
+)
+
 // handling conditions
-func (r *ClusterObjectReconciler) findCondition(ctx context.Context, conditionType string) (*metav1.Condition, error) {
+func (r *ClusterObjectReconciler) findCondition(
+	ctx context.Context,
+	co *clusterv1alpha1.ClusterObject,
+	conditionType string) (*metav1.Condition, error) {
 
 	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
-
-	var co = &clusterv1alpha1.ClusterObject{}
-	if err := co.FromContext(ctx); err != nil {
-		_log.Error(err, "error reading clusterobject from context")
-		return nil, err
-	}
 
 	for i := range co.Status.Conditions {
 
@@ -146,6 +144,7 @@ func (r *ClusterObjectReconciler) findCondition(ctx context.Context, conditionTy
 // set conditions
 func (r *ClusterObjectReconciler) setCondition(
 	ctx context.Context,
+	co *clusterv1alpha1.ClusterObject,
 	conditionType string,
 	status metav1.ConditionStatus,
 	reason string,
@@ -154,13 +153,7 @@ func (r *ClusterObjectReconciler) setCondition(
 
 	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
 
-	var co = &clusterv1alpha1.ClusterObject{}
-	if err := co.FromContext(ctx); err != nil {
-		_log.Error(err, "error reading clusterobject from context")
-		return err
-	}
-
-	_condition, err := r.findCondition(ctx, conditionType)
+	_condition, err := r.findCondition(ctx, co, conditionType)
 	if err != nil {
 		_log.Error(err, "error reading clusterobject from context")
 		return err
