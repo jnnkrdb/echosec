@@ -188,7 +188,7 @@ func (r *ClusterObjectReconciler) reconcileObjectForNamespace(
 	// create copy of resources object
 	var typedObject = co.Replicator.Resource.DeepCopy()
 
-	_log.V(5).Info("object from resources cached", "*typedObject", *typedObject)
+	_log.V(5).Info("object from resources cached", "*typedObject", *typedObject, "*co.Replicator.Resource", *co.Replicator.Resource, "*co", *co)
 
 	// check, if the object does exist in the namespace and copy its content to cache
 	doesExist, err := r.objectExists(ctx, namespace.GetName(), typedObject)

@@ -84,9 +84,9 @@ type ClusterObjectReplicator struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,4,opt,name=labelSelector"`
 
-	// +required
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Resource unstructured.Unstructured `json:"resource"`
+	// +required
+	Resource *unstructured.Unstructured `json:"resource"`
 }
 
 // +kubebuilder:object:root=true

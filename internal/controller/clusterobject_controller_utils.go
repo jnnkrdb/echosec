@@ -86,6 +86,8 @@ func (r *ClusterObjectReconciler) objectExists(
 	namespace string,
 	typedObject *unstructured.Unstructured) (bool, error) {
 
+	// var _log = log.FromContext(ctx)
+
 	// check, if the requested object does exist in the namespace
 	if err := r.Get(ctx,
 		types.NamespacedName{
