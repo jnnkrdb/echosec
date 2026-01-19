@@ -122,7 +122,7 @@ const (
 func (r *ClusterObjectReconciler) findCondition(
 	ctx context.Context,
 	co *clusterv1alpha1.ClusterObject,
-	conditionType string) (*metav1.Condition, error) {
+	conditionType string) *metav1.Condition {
 
 	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
 
@@ -132,13 +132,13 @@ func (r *ClusterObjectReconciler) findCondition(
 
 			_log.V(5).Info("condition found", "condition", co.Status.Conditions[i])
 
-			return &co.Status.Conditions[i], nil
+			return &co.Status.Conditions[i]
 		}
 	}
 
 	_log.V(5).Info("condition not found")
 
-	return nil, nil
+	return nil
 }
 
 // set conditions
@@ -153,15 +153,9 @@ func (r *ClusterObjectReconciler) setCondition(
 
 	var _log = log.FromContext(ctx).WithValues("conditionType", conditionType)
 
-	_condition, err := r.findCondition(ctx, co, conditionType)
-	if err != nil {
-		_log.Error(err, "error reading clusterobject from context")
-		return err
-	}
-
 	// if there is no condition with the specified type, then create a new condition and
 	// add it to the list of conditions
-	if _condition == nil {
+	if _condition := r.findCondition(ctx, co, conditionType); _condition == nil {
 
 		c := metav1.Condition{
 			Type:               conditionType,
