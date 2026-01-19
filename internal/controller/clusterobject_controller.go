@@ -322,7 +322,17 @@ func (r *ClusterObjectReconciler) deleteObject(
 	_log.V(3).Info("deleting")
 
 	// check if the found item belongs to the clusterobject reference
-	if !slices.Contains(typedObject.GetOwnerReferences(), *metav1.NewControllerRef(co, co.GroupVersionKind())) {
+	ownerRefs := typedObject.GetOwnerReferences()
+	estimatedOwnerRef := *metav1.NewControllerRef(co, co.GroupVersionKind())
+	contains := slices.Contains(ownerRefs, estimatedOwnerRef)
+
+	_log.V(5).Info("checking ownerreferences",
+		"ownerRefs", ownerRefs,
+		"estimatedOwnerRef", estimatedOwnerRef,
+		"contains", contains,
+	)
+
+	if !contains {
 
 		_log.V(3).Info("object does not contain ownerreference, blocking deletion",
 			"ownerref.UID", co.GetUID(),
