@@ -8,12 +8,10 @@ metadata:
 replicator:
   labelSelector:
     matchExpressions:
-      - key: kubernetes.io/metadata.name
+      - key: jnnkrdb.de/inherit
         operator: In
         values:
-          - whoami
-          - default
-          - r8r-dev
+          - clusterobject-sample-4
   resource:
     apiVersion: v1
     kind: ConfigMap
