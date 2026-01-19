@@ -330,7 +330,10 @@ func (r *ClusterObjectReconciler) deleteObject(
 		"ownerRefs", ownerRefs,
 		"estimatedOwnerRef", estimatedOwnerRef,
 		"contains", contains,
+		"metav1.IsControlledBy(typedObject, co)", metav1.IsControlledBy(typedObject, co),
 	)
+
+	metav1.IsControlledBy(typedObject, co)
 
 	if !contains {
 
