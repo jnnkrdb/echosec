@@ -43,7 +43,12 @@ import (
 // parameters:
 //   - ctx context.Contex -> this is the default given context
 //   - err error          -> this is the thrown error, which should be handled
-func (r *ClusterObjectReconciler) throwOnError(ctx context.Context, co *clusterv1alpha1.ClusterObject, err error, event, msg string) error {
+func (r *ClusterObjectReconciler) throwOnError(
+	ctx context.Context,
+	co *clusterv1alpha1.ClusterObject,
+	err error,
+	event,
+	msg string) error {
 
 	// if the error is in fact nil, then leave early
 	if err == nil {
